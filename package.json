@@ -1,0 +1,48 @@
+{
+  "name": "naki-daifugo",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=18.0.0" },
+  "scripts": {
+    "dev": "next dev",
+    "dev:server": "ts-node-dev --respawn --transpile-only -P server/tsconfig.json server/src/index.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "dev:proxy": "node scripts/https-proxy.js",
+    "dev:all:https": "concurrently \"npm run dev\" \"npm run dev:server\" \"npm run dev:proxy\"",
+    "build": "next build && tsc -p server/tsconfig.json",
+    "start": "NODE_ENV=production node server/dist/server/src/index.js",
+    "start:server": "node server/dist/server/src/index.js",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@letele/playing-cards": "^0.1.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "lucide-react": "^0.575.0",
+    "next": "16.1.6",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "shadcn": "^3.8.5",
+    "tailwindcss": "^4",
+    "ts-node-dev": "^2.0.0",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5"
+  }
+}
