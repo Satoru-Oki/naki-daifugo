@@ -243,7 +243,7 @@ async function main() {
   });
 
   // Next.js キャッチオール（Express ルートより後に配置）
-  app.all("*", (req, res) => handle(req, res));
+  app.all("/{*path}", (req, res) => handle(req, res));
 
   const PORT = process.env.PORT || 3001;
   httpServer.listen(PORT, () => {
