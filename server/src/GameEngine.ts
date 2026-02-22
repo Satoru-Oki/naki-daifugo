@@ -591,6 +591,11 @@ export class GameEngine {
 
   /** 次のラウンド開始: カード配布 + 交換フェーズ */
   startNextRound(): void {
+    if (this.players.length === 0) {
+      this.phase = "waiting";
+      return;
+    }
+
     this.round++;
     this.field = [];
     this.discardPile = [];

@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { GameEngine } from "./GameEngine";
+import { canNaki } from "../../shared/gameLogic";
 import type { ClientToServerEvents, ServerToClientEvents, ClientGameState, RoomInfo } from "../../shared/events";
 
 type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -26,6 +27,7 @@ export class GameRoom {
   engine: GameEngine;
   maxPlayers: number;
   nextRoundTimer: ReturnType<typeof setTimeout> | null = null;
+  nakiTimer: ReturnType<typeof setTimeout> | null = null;
   pendingJoin: PendingJoin | null = null;
   voiceUsers: Set<string> = new Set();
   private io: Server;
@@ -177,6 +179,16 @@ export class GameRoom {
       message: `${player?.name || "プレイヤー"}が切断しました（5分以内に再接続で次ラウンドから復帰）`,
     });
 
+    // エンジンからプレイヤーが全員いなくなった場合、待機状態に戻す
+    if (this.engine.players.length === 0) {
+      if (this.nextRoundTimer) {
+        clearTimeout(this.nextRoundTimer);
+        this.nextRoundTimer = null;
+      }
+      this.engine.phase = "waiting";
+      return;
+    }
+
     if (this.engine.players.length > 0) {
       this.broadcastGameState();
     }
@@ -241,6 +253,15 @@ export class GameRoom {
     // 全員にゲーム状態を再送信（ターン情報の同期を保証）
     this.broadcastGameState();
     this.broadcastRoomInfo();
+
+    // 鳴きチャンス中なら intercept_window を再送
+    if (this.engine.phase === "naki_chance" && this.engine.field.length > 0) {
+      const card = this.engine.field[0];
+      const enginePlayer = this.engine.players.find((p) => p.id === playerId);
+      if (enginePlayer && canNaki(card, enginePlayer.hand).possible) {
+        socket.emit("intercept_window", { card });
+      }
+    }
   }
 
   /** 切断中プレイヤーを他のメンバーに通知 */
@@ -259,6 +280,7 @@ export class GameRoom {
   /** 特定プレイヤーにゲーム状態を送信 */
   sendGameStateTo(player: RoomPlayer): void {
     if (this.engine.phase === "waiting" || this.engine.players.length === 0) return;
+    if (!this.engine.currentPlayer) return;
     const scores = this.engine.players.map((p) => ({ id: p.id, name: p.name, score: p.totalScore, avatar: p.avatar }));
     const state: ClientGameState = {
       phase: this.engine.phase,
@@ -373,6 +395,7 @@ export class GameRoom {
     });
 
     socket.on("intercept", () => {
+      this.clearNakiTimer();
       const result = this.engine.doIntercept(playerId);
       if (!result.success) {
         socket.emit("game_error", { message: result.error! });
@@ -398,6 +421,7 @@ export class GameRoom {
     });
 
     socket.on("skip_intercept", () => {
+      this.clearNakiTimer();
       if (this.engine.phase !== "naki_chance") return;
       this.engine.resolveNakiWindow();
       this.broadcastGameState();
@@ -487,10 +511,29 @@ export class GameRoom {
     });
   }
 
-  /** 鳴きウィンドウ開始（タイマーなし — 鳴く/スルーの選択必須） */
+  /** 鳴きウィンドウ開始（10秒タイムアウト付き） */
   private startNakiWindow(): void {
+    this.clearNakiTimer();
     const card = this.engine.field[0];
     this.io.to(this.id).emit("intercept_window", { card });
+
+    this.nakiTimer = setTimeout(() => {
+      this.nakiTimer = null;
+      if (this.engine.phase !== "naki_chance") return;
+      this.engine.resolveNakiWindow();
+      this.broadcastGameState();
+      if ((this.engine.phase as string) === "round_end") {
+        this.endRound();
+      }
+    }, 10_000);
+  }
+
+  /** 鳴きタイマーをクリア */
+  private clearNakiTimer(): void {
+    if (this.nakiTimer) {
+      clearTimeout(this.nakiTimer);
+      this.nakiTimer = null;
+    }
   }
 
 
@@ -522,6 +565,13 @@ export class GameRoom {
         }
       }
 
+      // プレイヤーが2人未満なら次ラウンド開始不可 → 待機状態に戻す
+      if (this.engine.players.length < 2) {
+        this.engine.phase = "waiting";
+        this.broadcastRoomInfo();
+        return;
+      }
+
       this.engine.startNextRound();
 
       // 大貧民/貧民の自動交換を実行
@@ -541,6 +591,7 @@ export class GameRoom {
   /** ゲーム状態を各プレイヤーに送信（手札は本人のみ） */
   private broadcastGameState(): void {
     if (this.engine.players.length === 0) return;
+    if (!this.engine.currentPlayer) return;
     for (const player of this.players) {
       const scores = this.engine.players.map((p) => ({ id: p.id, name: p.name, score: p.totalScore, avatar: p.avatar }));
       const state: ClientGameState = {

@@ -325,11 +325,15 @@ export default function GamePage() {
 
   const playCards = useCallback(() => {
     if (selected.size === 0 || !isMyTurn) return;
+    if (!socketRef.current?.connected) {
+      notify("接続中…しばらくお待ちください");
+      return;
+    }
     const cardIds = Array.from(selected);
-    socketRef.current?.emit("play_card", { cardIds });
+    socketRef.current.emit("play_card", { cardIds });
     playCardSfx();
     setSelected(new Set());
-  }, [selected, isMyTurn]);
+  }, [selected, isMyTurn, notify]);
 
   const doNaki = useCallback(() => {
     socketRef.current?.emit("intercept");
@@ -343,9 +347,13 @@ export default function GamePage() {
 
   const doPass = useCallback(() => {
     if (!isMyTurn) return;
-    socketRef.current?.emit("pass");
+    if (!socketRef.current?.connected) {
+      notify("接続中…しばらくお待ちください");
+      return;
+    }
+    socketRef.current.emit("pass");
     playPassSfx();
-  }, [isMyTurn]);
+  }, [isMyTurn, notify]);
 
   const sendChat = useCallback((text: string) => {
     socketRef.current?.emit("chat_message", { text });
@@ -517,7 +525,7 @@ export default function GamePage() {
           )}
         </div>
 
-        <ActionButtons canPlay={canPlay} canPass={isMyTurn} onPlay={playCards} onPass={doPass} chatOpen={chatOpen} onChatToggle={() => setChatOpen(!chatOpen)} />
+        <ActionButtons canPlay={canPlay && connected} canPass={isMyTurn && connected} onPlay={playCards} onPass={doPass} chatOpen={chatOpen} onChatToggle={() => setChatOpen(!chatOpen)} />
         <div className="relative">
           <button
             onClick={() => { if (window.confirm("ゲームから退出しますか？")) handleLeave(); }}
