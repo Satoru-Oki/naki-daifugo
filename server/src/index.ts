@@ -19,14 +19,16 @@ async function main() {
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL || [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://192.168.40.136:3000",
-        "http://192.168.40.136:3001",
-        "https://localhost:3443",
-        "https://192.168.40.136:3443",
-      ],
+      origin: process.env.NODE_ENV === "production"
+        ? true
+        : process.env.CLIENT_URL || [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://192.168.40.136:3000",
+            "http://192.168.40.136:3001",
+            "https://localhost:3443",
+            "https://192.168.40.136:3443",
+          ],
       methods: ["GET", "POST"],
     },
     pingInterval: 25_000,
