@@ -104,12 +104,13 @@ export default function GamePage() {
       setConnected(true);
     });
     socket.on("disconnect", (reason) => {
+      console.log(`[socket] disconnect reason=${reason}`);
       setConnected(false);
-      if (reason === "io server disconnect") {
-        // サーバーから切断された場合は手動で再接続
+      if (reason === "io server disconnect" || reason === "transport close") {
+        // サーバー切断 or トランスポート断 → 即座に再接続試行
         socket.connect();
       }
-      // その他の理由（transport close等）はSocket.ioが自動再接続する
+      // その他の理由（ping timeout等）はSocket.ioが自動再接続する
     });
 
     // セッション情報受信

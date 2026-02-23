@@ -31,8 +31,8 @@ async function main() {
           ],
       methods: ["GET", "POST"],
     },
-    pingInterval: 25_000,
-    pingTimeout: 180_000,
+    pingInterval: 10_000,
+    pingTimeout: 20_000,
   });
 
   // ルーム管理
@@ -200,8 +200,8 @@ async function main() {
       }
     });
 
-    socket.on("disconnect", () => {
-      console.log(`[切断] ${socket.id}`);
+    socket.on("disconnect", (reason) => {
+      console.log(`[切断] ${socket.id} reason=${reason}`);
 
       // socketToSessionに無い場合は既に名前マッチ再接続で無効化済み
       if (!socketToSession.has(socket.id)) {

@@ -120,10 +120,10 @@ export function startKeepAlive(s: GameSocket): void {
     };
   } catch { /* Worker非対応環境は無視 */ }
 
-  // HTTP keepalive: Renderのスピンダウン防止（4分間隔でヘルスチェック）
+  // HTTP keepalive: Renderのスピンダウン防止（2分間隔でヘルスチェック）
   httpKeepAliveTimer = setInterval(() => {
     fetch("/api/health").catch(() => {});
-  }, 4 * 60_000);
+  }, 2 * 60_000);
 
   // visibilitychange: タブ復帰時に接続チェック
   document.addEventListener("visibilitychange", handleVisibility);
