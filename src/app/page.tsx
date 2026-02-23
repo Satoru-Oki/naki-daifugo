@@ -345,7 +345,7 @@ export default function GamePage() {
   }, []);
 
   // --- ゲーム操作 ---
-  const isMyTurn = currentTurn === myId;
+  const isMyTurn = currentTurn === myId && phase === "playing";
   const canPlay = selected.size > 0 && isMyTurn;
 
   const tapCard = useCallback((id: string) => {
@@ -568,7 +568,7 @@ export default function GamePage() {
           >
             退出
           </button>
-          <Hand cards={hand} selectedIds={selected} onTapCard={tapCard} enabled={true} dealing={dealing} />
+          <Hand cards={hand} selectedIds={selected} onTapCard={tapCard} enabled={phase !== "card_exchange"} dealing={dealing} />
         </div>
         <GameInfoBar rank={myRank} round={round} revolution={isRevolution} elevenBack={isElevenBack} nakiCount={nakiCount} />
         <div style={{ backgroundColor: "var(--bg-darker, #1a5a2e)" }}>

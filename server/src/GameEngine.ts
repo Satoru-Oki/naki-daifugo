@@ -237,6 +237,7 @@ export class GameEngine {
     elevenBack?: boolean;
     playerFinished?: boolean;
   } {
+    if (this.phase !== "playing") return { success: false, error: "現在カードを出せません" };
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { success: false, error: "プレイヤーが見つかりません" };
     if (this.currentPlayer.id !== playerId) return { success: false, error: "あなたのターンではありません" };
@@ -465,6 +466,7 @@ export class GameEngine {
 
   /** パス */
   doPass(playerId: string): { success: boolean; error?: string; fieldCleared?: boolean } {
+    if (this.phase !== "playing") return { success: false, error: "現在パスできません" };
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { success: false, error: "プレイヤーが見つかりません" };
     if (this.currentPlayer.id !== playerId) return { success: false, error: "あなたのターンではありません" };
