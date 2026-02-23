@@ -138,8 +138,21 @@ function PlayerIcon({ player }: { player: Player }) {
   );
 }
 
-/** ラベル: 枚数（上）→ 名前（下）の縦積み */
-function PlayerLabel({ player }: { player: Player }) {
+/** ラベル: 枚数と名前の表示。inline=true で横並び */
+function PlayerLabel({ player, inline = false }: { player: Player; inline?: boolean }) {
+  if (inline) {
+    return (
+      <div className="flex items-center gap-1.5 mb-1">
+        {player.cardCount > 0 ? (
+          <span className="text-white/70 text-base font-bold leading-tight">{player.cardCount}枚</span>
+        ) : (
+          <span className="text-amber-400 text-base font-bold leading-tight">上がり</span>
+        )}
+        <span className="text-white text-lg font-bold leading-tight">{player.name}</span>
+        {player.passed && <span className="text-red-400 text-sm font-bold leading-tight">PASS</span>}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col items-center mb-1">
       {player.cardCount > 0 ? (
@@ -158,7 +171,7 @@ function TopAvatar({ player }: { player: Player }) {
   const dimmed = player.passed ? "opacity-40" : "";
   return (
     <div className={`flex flex-col items-center ${dimmed}`}>
-      <PlayerLabel player={player} />
+      <PlayerLabel player={player} inline />
       {/* カード領域 + アイコン重ね */}
       <div className="relative mt-0.5">
         {/* カード（背面） */}
