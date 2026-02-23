@@ -33,6 +33,8 @@ export class GameRoom {
   private io: Server;
   private disconnectedScores = new Map<string, number>();
   private engineRemovalTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private disconnectedPlayerIds = new Set<string>();
+  private autoPassTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(io: Server, roomId: string, maxPlayers = 5) {
     this.io = io;
@@ -137,9 +139,11 @@ export class GameRoom {
     socket.emit("join_request_result", { accepted: false, message: "参加が拒否されました" });
   }
 
-  /** エンジン除外を遅延スケジュール（リロード復帰のための猶予） */
+  /** エンジン除外を遅延スケジュール（リロード復帰のための猶予：3分） */
   scheduleEngineRemoval(playerId: string): void {
     this.cancelEngineRemoval(playerId);
+
+    this.disconnectedPlayerIds.add(playerId);
 
     const player = this.players.find((p) => p.id === playerId);
     this.broadcast("notification", {
@@ -149,13 +153,18 @@ export class GameRoom {
     const timer = setTimeout(() => {
       this.engineRemovalTimers.delete(playerId);
       this.removePlayerFromGame(playerId);
-    }, 5000);
+    }, 180_000);
 
     this.engineRemovalTimers.set(playerId, timer);
+
+    // 切断プレイヤーのターンなら自動パスをスケジュール
+    this.scheduleAutoPass();
   }
 
   /** エンジン除外のスケジュールをキャンセル */
   cancelEngineRemoval(playerId: string): void {
+    this.disconnectedPlayerIds.delete(playerId);
+
     const timer = this.engineRemovalTimers.get(playerId);
     if (timer) {
       clearTimeout(timer);
@@ -165,6 +174,8 @@ export class GameRoom {
 
   /** ゲームからのみ除外（ルームには残す、切断時用） */
   removePlayerFromGame(playerId: string): void {
+    this.disconnectedPlayerIds.delete(playerId);
+
     const enginePlayer = this.engine.players.find((p) => p.id === playerId);
     if (!enginePlayer) return;
 
@@ -199,6 +210,8 @@ export class GameRoom {
 
   /** プレイヤー退出（ルームからも完全削除） */
   leave(playerId: string): void {
+    this.disconnectedPlayerIds.delete(playerId);
+
     const player = this.players.find((p) => p.id === playerId);
     if (player) {
       player.socket.leave(this.id);
@@ -511,6 +524,52 @@ export class GameRoom {
     });
   }
 
+  /** 切断中プレイヤーのターンなら自動パスをスケジュール */
+  private scheduleAutoPass(): void {
+    if (this.autoPassTimer) return;
+
+    this.autoPassTimer = setTimeout(() => {
+      this.autoPassTimer = null;
+      this.autoPassIfDisconnected();
+    }, 1000);
+  }
+
+  /** 切断中プレイヤーが現在のターンなら自動パスを実行 */
+  private autoPassIfDisconnected(): void {
+    if (this.engine.phase !== "playing") return;
+    if (!this.engine.currentPlayer) return;
+
+    const currentId = this.engine.currentPlayer.id;
+    if (!this.disconnectedPlayerIds.has(currentId)) return;
+
+    // 接続中のアクティブプレイヤーが0人なら無限ループ防止のため停止
+    const hasConnectedActive = this.engine.players.some(
+      (p) => !p.finished && !this.disconnectedPlayerIds.has(p.id)
+    );
+    if (!hasConnectedActive) return;
+
+    const result = this.engine.doPass(currentId);
+    if (!result.success) return;
+
+    const player = this.players.find((p) => p.id === currentId);
+    this.broadcast("notification", {
+      message: `${player?.name || "プレイヤー"}は切断中のため自動パス`,
+    });
+
+    if (result.fieldCleared) {
+      this.broadcast("notification", { message: "場が流れました" });
+    }
+
+    this.broadcastGameState();
+
+    if ((this.engine.phase as string) === "round_end") {
+      this.endRound();
+    } else {
+      // 次のターンも切断中プレイヤーかもしれないので再チェック
+      this.scheduleAutoPass();
+    }
+  }
+
   /** 鳴きウィンドウ開始（10秒タイムアウト付き） */
   private startNakiWindow(): void {
     this.clearNakiTimer();
@@ -612,6 +671,9 @@ export class GameRoom {
       };
       player.socket.emit("game_state", state);
     }
+
+    // 切断中プレイヤーのターンなら自動パスをスケジュール
+    this.scheduleAutoPass();
   }
 
   /** ルーム情報を全員に送信 */
