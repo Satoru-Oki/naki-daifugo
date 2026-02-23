@@ -95,7 +95,16 @@ async function main() {
 
           console.log(`[再接続] ${session.playerName} → ${session.roomId}`);
           room.notifyAll(`${session.playerName}が再接続しました`);
+        } else {
+          // ルームが消えている（サーバー再起動等）
+          console.log(`[セッション切れ] sessionId=${authSessionId} ルーム/プレイヤー不在`);
+          sessionManager.removeSession(authSessionId);
+          socket.emit("session_expired");
         }
+      } else {
+        // セッション自体が存在しない（サーバー再起動でインメモリ消失）
+        console.log(`[セッション切れ] sessionId=${authSessionId} セッション不在`);
+        socket.emit("session_expired");
       }
     }
 

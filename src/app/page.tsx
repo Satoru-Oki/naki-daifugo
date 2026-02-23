@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { GameCard, ChatMessage, Player } from "@/lib/types";
 import { NAKI_RANKS } from "@/lib/constants";
 import { canNaki, isJoker, sortHand } from "@/lib/gameLogic";
-import { connectSocket, disconnectAndClearSession, getStoredSessionId, storeSessionId, storeLastRoom, clearLastRoom, startKeepAlive, stopKeepAlive, type GameSocket } from "@/lib/socket";
+import { connectSocket, disconnectAndClearSession, getStoredSessionId, storeSessionId, clearSessionId, storeLastRoom, clearLastRoom, getLastRoom, startKeepAlive, stopKeepAlive, type GameSocket } from "@/lib/socket";
 import { playDeal, playCard as playCardSfx, playPass as playPassSfx, playTurnNotify, playNaki, playRevolution, playMiyakoOchi, playChat } from "@/lib/sfx";
 import { VoiceChat, type VoiceUser } from "@/lib/webrtc";
 import type { ClientGameState, RoomInfo } from "../../shared/events";
@@ -95,6 +95,7 @@ export default function GamePage() {
     socket.off("chat_message");
     socket.off("notification");
     socket.off("game_error");
+    socket.off("session_expired");
     socket.off("join_request");
     socket.off("join_request_result");
 
@@ -233,6 +234,24 @@ export default function GamePage() {
         }
         return prev;
       });
+    });
+
+    // セッション切れ（サーバー再起動等）→ lastRoom情報で自動再参加を試みる
+    socket.on("session_expired", () => {
+      clearSessionId();
+      const lastRoom = getLastRoom();
+      if (lastRoom) {
+        notify("サーバーが再起動されました。再参加中…");
+        socket.emit("join_room", {
+          roomId: lastRoom.roomId,
+          playerName: lastRoom.playerName,
+          avatar: lastRoom.avatar,
+        });
+        setScreen("waiting");
+      } else {
+        notify("セッションが切れました。ロビーに戻ります");
+        setScreen("lobby");
+      }
     });
 
     // 参加要請を受信（既存メンバー側）

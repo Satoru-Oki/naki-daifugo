@@ -107,6 +107,7 @@ export function disconnectAndClearSession(): void {
 // --- Web Worker keepalive ---
 
 let keepAliveWorker: Worker | null = null;
+let httpKeepAliveTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startKeepAlive(s: GameSocket): void {
   stopKeepAlive();
@@ -118,6 +119,11 @@ export function startKeepAlive(s: GameSocket): void {
       if (s.connected) s.volatile.emit("heartbeat");
     };
   } catch { /* Worker非対応環境は無視 */ }
+
+  // HTTP keepalive: Renderのスピンダウン防止（4分間隔でヘルスチェック）
+  httpKeepAliveTimer = setInterval(() => {
+    fetch("/api/health").catch(() => {});
+  }, 4 * 60_000);
 
   // visibilitychange: タブ復帰時に接続チェック
   document.addEventListener("visibilitychange", handleVisibility);
@@ -164,5 +170,9 @@ export function stopKeepAlive(): void {
   keepAliveWorker?.postMessage("stop");
   keepAliveWorker?.terminate();
   keepAliveWorker = null;
+  if (httpKeepAliveTimer) {
+    clearInterval(httpKeepAliveTimer);
+    httpKeepAliveTimer = null;
+  }
   document.removeEventListener("visibilitychange", handleVisibility);
 }

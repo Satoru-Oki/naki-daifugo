@@ -33,6 +33,7 @@ export interface ServerToClientEvents {
   player_joined: (data: { playerId: string; playerName: string }) => void;
   player_left: (data: { playerId: string }) => void;
   notification: (data: { message: string }) => void;
+  session_expired: () => void;
   join_request: (data: { playerName: string }) => void;
   join_request_result: (data: { accepted: boolean; message: string }) => void;
   voice_user_joined: (data: { userId: string; userName: string }) => void;
