@@ -2,10 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { GameCard, ChatMessage, Player } from "@/lib/types";
-import { NAKI_RANKS } from "@/lib/constants";
+import { NAKI_RANKS, VOICE_STAMPS } from "@/lib/constants";
 import { canNaki, isJoker, sortHand } from "@/lib/gameLogic";
 import { connectSocket, disconnectAndClearSession, getStoredSessionId, storeSessionId, clearSessionId, storeLastRoom, clearLastRoom, getLastRoom, startKeepAlive, stopKeepAlive, type GameSocket } from "@/lib/socket";
-import { playDeal, playCard as playCardSfx, playPass as playPassSfx, playTurnNotify, playNaki, playRevolution, playMiyakoOchi, playChat } from "@/lib/sfx";
+import { playDeal, playCard as playCardSfx, playPass as playPassSfx, playTurnNotify, playNaki, playRevolution, playMiyakoOchi, playChat, playVoiceStamp } from "@/lib/sfx";
 import { VoiceChat, type VoiceUser } from "@/lib/webrtc";
 import type { ClientGameState, RoomInfo } from "../../shared/events";
 
@@ -100,6 +100,7 @@ export default function GamePage() {
     socket.off("session_expired");
     socket.off("join_request");
     socket.off("join_request_result");
+    socket.off("voice_stamp");
 
     // 接続状態の監視
     socket.on("connect", () => {
@@ -226,6 +227,14 @@ export default function GamePage() {
       if (msg.fromId !== myIdRef.current) {
         playChat();
         notify(`💬 ${msg.from}: ${msg.text}`);
+      }
+    });
+
+    socket.on("voice_stamp", (data: { fromId: string; fromName: string; stampId: string }) => {
+      playVoiceStamp(data.stampId);
+      const stamp = VOICE_STAMPS.find((v) => v.id === data.stampId);
+      if (data.fromId !== myIdRef.current) {
+        notify(`🔊 ${data.fromName}: ${stamp?.label || data.stampId}`);
       }
     });
 
@@ -393,6 +402,10 @@ export default function GamePage() {
     socketRef.current?.emit("chat_message", { text });
   }, []);
 
+  const sendVoiceStamp = useCallback((stampId: string) => {
+    socketRef.current?.emit("voice_stamp", { stampId });
+  }, []);
+
   const joinVoice = useCallback(async () => {
     const socket = socketRef.current;
     if (!socket) {
@@ -481,6 +494,7 @@ export default function GamePage() {
         onLeave={handleLeave}
         messages={messages}
         onSendChat={sendChat}
+        onVoiceStamp={sendVoiceStamp}
         inVoice={inVoice}
         voiceUsers={voiceUsers}
         micEnabled={micEnabled}
@@ -575,7 +589,7 @@ export default function GamePage() {
           <Scoreboard scores={scores} myId={myId} />
         </div>
 
-        {chatOpen && <ChatPanel messages={messages} onSend={sendChat} />}
+        {chatOpen && <ChatPanel messages={messages} onSend={sendChat} onVoiceStamp={sendVoiceStamp} />}
       </div>
     );
   }

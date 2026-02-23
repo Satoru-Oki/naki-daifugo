@@ -483,6 +483,17 @@ export class GameRoom {
       }
     });
 
+    socket.on("voice_stamp", (data) => {
+      const player = this.players.find((p) => p.id === playerId);
+      if (player) {
+        this.broadcast("voice_stamp", {
+          fromId: playerId,
+          fromName: player.name,
+          stampId: data.stampId,
+        });
+      }
+    });
+
     socket.on("join_request_response", (data) => {
       if (!this.pendingJoin) return;
       if (data.accept) {

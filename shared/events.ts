@@ -11,6 +11,7 @@ export interface ClientToServerEvents {
   card_exchange: (data: { cardIds: string[] }) => void;
   chat_message: (data: { text: string }) => void;
   quick_message: (data: { text: string }) => void;
+  voice_stamp: (data: { stampId: string }) => void;
   heartbeat: () => void;
   start_game: () => void;
   join_request_response: (data: { accept: boolean }) => void;
@@ -36,6 +37,7 @@ export interface ServerToClientEvents {
   session_expired: () => void;
   join_request: (data: { playerName: string }) => void;
   join_request_result: (data: { accepted: boolean; message: string }) => void;
+  voice_stamp: (data: { fromId: string; fromName: string; stampId: string }) => void;
   voice_user_joined: (data: { userId: string; userName: string }) => void;
   voice_user_left: (data: { userId: string }) => void;
   voice_signal: (data: { fromId: string; signal: unknown }) => void;

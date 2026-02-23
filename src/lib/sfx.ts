@@ -253,6 +253,14 @@ export function playChat(): void {
   osc.stop(t + duration);
 }
 
+/** ボイススタンプ再生 — .m4aファイルをHTMLAudioElementで再生 */
+export function playVoiceStamp(stampId: string): void {
+  const audio = new Audio(`/audio/${stampId}.m4a`);
+  audio.play().catch(() => {
+    // ユーザー操作前の自動再生制限等でエラーになる場合は無視
+  });
+}
+
 /** カード出し音 — 短いノイズバースト（シュッ） */
 export function playCard(): void {
   const ac = getContext();

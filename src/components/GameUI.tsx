@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { ChatMessage, GameCard } from "@/lib/types";
 import type { VoiceUser } from "@/lib/webrtc";
-import { QUICK_MESSAGES } from "@/lib/constants";
+import { QUICK_MESSAGES, VOICE_STAMPS } from "@/lib/constants";
 import HistoryPanel from "./HistoryPanel";
 
 // ─── Voice Bar ───
@@ -164,6 +164,7 @@ export function GameInfoBar({ rank, round, revolution, elevenBack }: GameInfoPro
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSend: (text: string) => void;
+  onVoiceStamp?: (stampId: string) => void;
   positionClassName?: string;
 }
 
@@ -180,7 +181,7 @@ export function ChatToggle({ open, onClick }: { open: boolean; onClick: () => vo
   );
 }
 
-export function ChatPanel({ messages, onSend, positionClassName }: ChatPanelProps) {
+export function ChatPanel({ messages, onSend, onVoiceStamp, positionClassName }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -217,6 +218,20 @@ export function ChatPanel({ messages, onSend, positionClassName }: ChatPanelProp
           </button>
         ))}
       </div>
+      {onVoiceStamp && (
+        <div className="flex gap-1.5 px-3 py-1.5 flex-wrap border-b border-[#1a2e1e]/20">
+          {VOICE_STAMPS.map((vs) => (
+            <button
+              key={vs.id}
+              onClick={() => onVoiceStamp(vs.id)}
+              className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-2 py-1
+                text-xs text-purple-300 cursor-pointer transition-colors hover:bg-purple-500/20"
+            >
+              🔊 {vs.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="max-h-[220px] overflow-y-auto px-3 py-2">
         {messages.map((m, i) => (
           <div key={i} className="mb-1.5">

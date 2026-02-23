@@ -16,6 +16,7 @@ interface WaitingRoomProps {
   onLeave: () => void;
   messages: ChatMessage[];
   onSendChat: (text: string) => void;
+  onVoiceStamp: (stampId: string) => void;
   inVoice: boolean;
   voiceUsers: VoiceUser[];
   micEnabled: boolean;
@@ -27,7 +28,7 @@ interface WaitingRoomProps {
 }
 
 export default function WaitingRoom({
-  roomInfo, myId, onStartGame, onLeave, messages, onSendChat,
+  roomInfo, myId, onStartGame, onLeave, messages, onSendChat, onVoiceStamp,
   inVoice, voiceUsers, micEnabled, speakerEnabled,
   onJoinVoice, onLeaveVoice, onToggleMic, onToggleSpeaker,
 }: WaitingRoomProps) {
@@ -205,6 +206,7 @@ export default function WaitingRoom({
         <ChatPanel
           messages={messages}
           onSend={onSendChat}
+          onVoiceStamp={onVoiceStamp}
           positionClassName="fixed bottom-20 right-4"
         />
       )}

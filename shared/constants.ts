@@ -51,6 +51,16 @@ export const QUICK_MESSAGES = [
   "飯ぐらいおごってくれ",
 ];
 
+/** ボイススタンプ定義 */
+export const VOICE_STAMPS = [
+  { id: "bakayaro", file: "/audio/bakayaro.m4a", label: "バカヤロー" },
+  { id: "daredemokakattekoi", file: "/audio/daredemokakattekoi.m4a", label: "かかってこい" },
+  { id: "douttekotoneyo", file: "/audio/douttekotoneyo.m4a", label: "どうってことねーよ" },
+  { id: "genkidesuka", file: "/audio/genkidesuka.m4a", label: "元気ですか" },
+  { id: "sorehasoredeii", file: "/audio/sorehasoredeii.m4a", label: "それはそれでいい" },
+  { id: "yarerunokaoi", file: "/audio/yarerunokaoi.m4a", label: "やれるのかおい" },
+];
+
 /** @letele/playing-cards のコンポーネント名マッピング */
 export function getCardComponentName(suit: Suit, rank: Rank): string {
   const rankMap: Record<string, string> = {
