@@ -148,7 +148,7 @@ export function GameInfoBar({ rank, round, revolution, elevenBack }: GameInfoPro
   ];
 
   return (
-    <div className="flex justify-around px-3.5 py-2 pb-3 transition-colors duration-500"
+    <div className="flex justify-around px-3.5 py-2 pb-3 sm:py-1 sm:pb-1 transition-colors duration-500"
       style={{ backgroundColor: "var(--bg-darker, #1a5a2e)", borderTop: "1px solid var(--border-dark, #145228)" }}>
       {items.map((item) => (
         <div key={item.label} className="text-center">

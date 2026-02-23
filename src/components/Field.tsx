@@ -24,7 +24,7 @@ function hashToFloat(h: number, salt: number): number {
 }
 
 /** カード群を描画（複数枚は左下を原点に扇形に広げる） */
-function CardGroup({ cards, size = "md" }: { cards: GameCard[]; size?: "md" | "lg" }) {
+function CardGroup({ cards, size = "md" }: { cards: GameCard[]; size?: "md" | "lg" | "xl" }) {
   const count = cards.length;
 
   if (count <= 1) {
@@ -40,8 +40,8 @@ function CardGroup({ cards, size = "md" }: { cards: GameCard[]; size?: "md" | "l
   return (
     <div className="relative"
       style={{
-        width: size === "lg" ? 60 : 48,
-        height: size === "lg" ? 84 : 67,
+        width: size === "xl" ? 72 : size === "lg" ? 60 : 48,
+        height: size === "xl" ? 101 : size === "lg" ? 84 : 67,
       }}
     >
       {cards.map((c, i) => (
@@ -73,7 +73,7 @@ function getOffset(cards: GameCard[]) {
 }
 
 /** 場のカード表示（スタック + 現在のカード） */
-function FieldPile({ cards, stack, size }: { cards: GameCard[]; stack: GameCard[][]; size: "md" | "lg" }) {
+function FieldPile({ cards, stack, size }: { cards: GameCard[]; stack: GameCard[][]; size: "md" | "lg" | "xl" }) {
   const lastIndex = stack.length - 1;
   return (
     <div className="relative">
@@ -105,7 +105,7 @@ export default function Field({ cards, stack = [] }: FieldProps) {
   const hasCurrent = cards.length > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80px] relative mt-4 sm:mt-6">
+    <div className="flex flex-col items-center justify-center min-h-[80px] relative mt-4 sm:mt-10">
       {/* Green felt effect */}
       <div className="absolute inset-4 rounded-[60px]"
         style={{ background: "radial-gradient(ellipse at center, rgba(34,85,51,0.15), transparent 70%)" }}
@@ -114,7 +114,7 @@ export default function Field({ cards, stack = [] }: FieldProps) {
         {hasCurrent ? (
           <>
             <div className="sm:hidden">
-              <FieldPile cards={cards} stack={stack} size="lg" />
+              <FieldPile cards={cards} stack={stack} size="xl" />
             </div>
             <div className="hidden sm:block">
               <FieldPile cards={cards} stack={stack} size="md" />

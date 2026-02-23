@@ -182,7 +182,7 @@ export default function Scoreboard({ scores, myId }: ScoreboardProps) {
   const me = scores.find((s) => s.id === myId);
 
   return (
-    <div className="px-3 py-2 flex items-center">
+    <div className="px-3 py-2 sm:py-1 flex items-center">
       {/* 左: 自分のアバター（大きく表示） */}
       <div className="flex-shrink-0 relative w-20 h-20 rounded-full overflow-hidden border-2 border-amber-400/50 ml-12">
         {me?.avatar ? (
