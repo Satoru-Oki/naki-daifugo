@@ -6,6 +6,26 @@ import { GameRoom } from "./GameRoom";
 import { SessionManager } from "./SessionManager";
 import type { ClientToServerEvents, ServerToClientEvents } from "../../shared/events";
 
+// プロセスレベルの診断: クラッシュ/SIGTERM を捕捉
+const startedAt = Date.now();
+function uptime() { return `${Math.round((Date.now() - startedAt) / 1000)}秒`; }
+
+process.on("SIGTERM", () => {
+  console.log(`[SIGTERM] Render からの停止シグナル受信 (uptime=${uptime()})`);
+  process.exit(0);
+});
+process.on("SIGINT", () => {
+  console.log(`[SIGINT] 中断シグナル受信 (uptime=${uptime()})`);
+  process.exit(0);
+});
+process.on("uncaughtException", (err) => {
+  console.error(`[CRASH] 未捕捉例外 (uptime=${uptime()}):`, err);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error(`[CRASH] 未処理Promise拒否 (uptime=${uptime()}):`, reason);
+});
+
 // Next.js アプリ初期化
 const dev = process.env.NODE_ENV !== "production";
 const nextApp = next({ dev, dir: process.cwd() });
@@ -46,7 +66,9 @@ async function main() {
 
   // ヘルスチェック
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", rooms: rooms.size });
+    const connections = io.engine?.clientsCount ?? 0;
+    console.log(`[health] uptime=${uptime()} rooms=${rooms.size} connections=${connections}`);
+    res.json({ status: "ok", rooms: rooms.size, uptime: uptime(), connections });
   });
 
   // ルーム一覧API
