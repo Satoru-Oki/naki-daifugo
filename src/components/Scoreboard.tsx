@@ -49,13 +49,13 @@ function ScoringRulesModal({ onClose }: { onClose: () => void }) {
               <td className="py-1">富豪</td>
               <td className="text-center">4</td>
               <td className="text-center">3</td>
-              <td className="text-center">2</td>
+              <td className="text-center">-</td>
             </tr>
             <tr className="border-b border-white/5">
               <td className="py-1">平民</td>
               <td className="text-center">2</td>
               <td className="text-center">-</td>
-              <td className="text-center">-</td>
+              <td className="text-center">2</td>
             </tr>
             <tr className="border-b border-white/5">
               <td className="py-1">貧民</td>

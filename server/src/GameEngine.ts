@@ -32,7 +32,7 @@ interface ExchangeEntry {
 const RANK_SCORE: Record<number, Record<PlayerRank, number>> = {
   5: { "大富豪": 7, "富豪": 4, "平民": 2, "貧民": 1, "大貧民": 0 },
   4: { "大富豪": 5, "富豪": 3, "平民": 0, "貧民": 1, "大貧民": 0 },
-  3: { "大富豪": 4, "富豪": 2, "平民": 0, "貧民": 0, "大貧民": 0 },
+  3: { "大富豪": 4, "富豪": 2, "平民": 2, "貧民": 0, "大貧民": 0 },
 };
 
 export class GameEngine {
