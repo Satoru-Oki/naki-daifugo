@@ -5,58 +5,103 @@ import PlayingCard from "./PlayingCard";
 
 interface FieldProps {
   cards: GameCard[];
-  prevCards?: GameCard[];
+  stack?: GameCard[][];
 }
 
-/** カード群を描画（重ね表示対応） */
-function CardGroup({ cards, opacity, size = "md" }: { cards: GameCard[]; opacity?: string; size?: "md" | "lg" }) {
-  const count = cards.length;
-  const overlap = count >= 4;
-  const overlapOffset = count >= 6 ? 18 : count >= 4 ? 22 : 0;
+/** カードIDから決定的なハッシュ値を生成（全クライアントで同じ結果） */
+function hashIds(ids: string): number {
+  let h = 0;
+  for (let i = 0; i < ids.length; i++) {
+    h = ((h << 5) - h + ids.charCodeAt(i)) | 0;
+  }
+  return h;
+}
 
-  if (overlap) {
+/** ハッシュから 0〜1 の値を返す */
+function hashToFloat(h: number, salt: number): number {
+  const v = Math.sin(h * 9301 + salt * 49297) * 49979;
+  return v - Math.floor(v);
+}
+
+/** カード群を描画（複数枚は左下を原点に扇形に広げる） */
+function CardGroup({ cards, size = "md" }: { cards: GameCard[]; size?: "md" | "lg" }) {
+  const count = cards.length;
+
+  if (count <= 1) {
     return (
-      <div className={`flex items-center justify-center ${opacity ?? ""}`}>
-        {cards.map((c, i) => (
-          <div
-            key={c.id}
-            style={{
-              marginLeft: i === 0 ? 0 : -overlapOffset,
-              zIndex: i,
-            }}
-          >
-            <PlayingCard card={c} size={size} />
-          </div>
-        ))}
+      <div>
+        {cards.map((c) => <PlayingCard key={c.id} card={c} size={size} />)}
       </div>
     );
   }
 
+  const spread = 8;
+
   return (
-    <div className={`flex gap-1.5 items-center ${opacity ?? ""}`}>
-      {cards.map((c) => <PlayingCard key={c.id} card={c} size={size} />)}
+    <div className="relative"
+      style={{
+        width: size === "lg" ? 60 : 48,
+        height: size === "lg" ? 84 : 67,
+      }}
+    >
+      {cards.map((c, i) => (
+        <div
+          key={c.id}
+          className="absolute left-0 bottom-0"
+          style={{
+            transformOrigin: "left bottom",
+            transform: `rotate(${(i - count + 1) * spread}deg)`,
+            zIndex: i,
+          }}
+        >
+          <PlayingCard card={c} size={size} />
+        </div>
+      ))}
     </div>
   );
 }
 
-/** 現在 + 直前カードのセット */
-function FieldStack({ cards, prevCards, size }: { cards: GameCard[]; prevCards: GameCard[]; size: "md" | "lg" }) {
-  const hasPrev = prevCards.length > 0;
+/** カードIDから決定的なオフセットを計算 */
+function getOffset(cards: GameCard[]) {
+  const ids = cards.map(c => c.id).join(",");
+  const h = hashIds(ids);
+  return {
+    x: Math.round((hashToFloat(h, 1) - 0.5) * 20),    // -10〜+10px
+    y: Math.round((hashToFloat(h, 2) - 0.5) * 16),     // -8〜+8px
+    rotate: Math.round((hashToFloat(h, 3) - 0.5) * 10), // -5〜+5deg
+  };
+}
+
+/** 場のカード表示（スタック + 現在のカード） */
+function FieldPile({ cards, stack, size }: { cards: GameCard[]; stack: GameCard[][]; size: "md" | "lg" }) {
+  const lastIndex = stack.length - 1;
   return (
     <div className="relative">
-      {hasPrev && (
-        <div className="absolute left-1/2 -translate-x-1/2 -top-6 z-0">
-          <CardGroup cards={prevCards} size={size} />
-        </div>
-      )}
-      <div className="relative z-10">
+      {/* 過去のカードをスタック表示 */}
+      {stack.map((layer, i) => {
+        const { x, y, rotate } = getOffset(layer);
+        const isLast = i === lastIndex;
+        return (
+          <div key={i} className="absolute left-0 top-0"
+            style={{
+              // 直前のカードは上に12pxずらして数字を見せる
+              transform: `translate(${x}px, ${isLast ? -12 + y : y}px) rotate(${rotate}deg)`,
+              zIndex: i,
+            }}
+          >
+            <CardGroup cards={layer} size={size} />
+          </div>
+        );
+      })}
+      {/* 現在のカード（最前面） */}
+      <div className="relative" style={{ zIndex: stack.length }}>
         <CardGroup cards={cards} size={size} />
       </div>
     </div>
   );
 }
 
-export default function Field({ cards, prevCards = [] }: FieldProps) {
+export default function Field({ cards, stack = [] }: FieldProps) {
   const hasCurrent = cards.length > 0;
 
   return (
@@ -68,13 +113,11 @@ export default function Field({ cards, prevCards = [] }: FieldProps) {
       <div className="relative z-[1] min-h-[68px] flex items-center justify-center">
         {hasCurrent ? (
           <>
-            {/* スマホ: lg サイズ */}
             <div className="sm:hidden">
-              <FieldStack cards={cards} prevCards={prevCards} size="lg" />
+              <FieldPile cards={cards} stack={stack} size="lg" />
             </div>
-            {/* PC: md サイズ */}
             <div className="hidden sm:block">
-              <FieldStack cards={cards} prevCards={prevCards} size="md" />
+              <FieldPile cards={cards} stack={stack} size="md" />
             </div>
           </>
         ) : (

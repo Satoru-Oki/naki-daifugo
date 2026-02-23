@@ -26,13 +26,13 @@ process.on("unhandledRejection", (reason) => {
   console.error(`[CRASH] 未処理Promise拒否 (uptime=${uptime()}):`, reason);
 });
 
-// Next.js アプリ初期化
+// Next.js アプリ初期化（本番のみ。開発時は next dev が別プロセスで動く）
 const dev = process.env.NODE_ENV !== "production";
-const nextApp = next({ dev, dir: process.cwd() });
-const handle = nextApp.getRequestHandler();
+const nextApp = dev ? null : next({ dev: false, dir: process.cwd() });
+const handle = nextApp ? nextApp.getRequestHandler() : null;
 
 async function main() {
-  await nextApp.prepare();
+  if (nextApp) await nextApp.prepare();
 
   const app = express();
   const httpServer = createServer(app);
@@ -275,13 +275,22 @@ async function main() {
     });
   });
 
-  // Next.js キャッチオール（Express ルートより後に配置）
-  app.all("/{*path}", (req, res) => handle(req, res));
+  // Next.js キャッチオール（本番のみ。開発時は next dev が配信）
+  if (handle) {
+    app.all("/{*path}", (req, res) => handle(req, res));
+  }
 
   const PORT = process.env.PORT || 3001;
-  httpServer.listen(PORT, () => {
-    console.log(`🀄 鳴き大富豪サーバー起動: http://localhost:${PORT}`);
-  });
+  const isDev = process.env.NODE_ENV !== "production";
+  if (isDev) {
+    httpServer.listen(Number(PORT), "0.0.0.0", () => {
+      console.log(`🀄 鳴き大富豪サーバー起動: http://0.0.0.0:${PORT}`);
+    });
+  } else {
+    httpServer.listen(PORT, () => {
+      console.log(`🀄 鳴き大富豪サーバー起動: http://localhost:${PORT}`);
+    });
+  }
 }
 
 main().catch(console.error);

@@ -36,7 +36,7 @@ export default function GamePage() {
   const [hand, setHand] = useState<GameCard[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [field, setField] = useState<GameCard[]>([]);
-  const [prevField, setPrevField] = useState<GameCard[]>([]);
+  const [fieldStack, setFieldStack] = useState<GameCard[][]>([]);
   const fieldRef = useRef<GameCard[]>([]);
   const [history, setHistory] = useState<GameCard[]>([]);
   const [currentTurn, setCurrentTurn] = useState("");
@@ -148,15 +148,15 @@ export default function GamePage() {
       const sorted = sortHand(state.hand, false);
       handRef.current = sorted;
       setHand(sorted);
-      // 場のカードが変わったら直前の場を保存
-      const prevIds = fieldRef.current.map(c => c.id).join(",");
+      // 場のカードが変わったらスタックに積む
+      const oldField = fieldRef.current;
+      const prevIds = oldField.map(c => c.id).join(",");
       const newIds = state.field.map((c: GameCard) => c.id).join(",");
       if (newIds !== prevIds) {
-        // 場が空になった（流れた）場合はprevFieldもクリア
         if (state.field.length === 0) {
-          setPrevField([]);
-        } else {
-          setPrevField(fieldRef.current);
+          setFieldStack([]);
+        } else if (oldField.length > 0) {
+          setFieldStack(prev => [...prev, oldField]);
         }
       }
       fieldRef.current = state.field;
@@ -541,7 +541,7 @@ export default function GamePage() {
           <div className="flex-[2]" />
           <div className="relative shrink-0">
             <SideOpponents players={players} />
-            <Field cards={field} prevCards={prevField} />
+            <Field cards={field} stack={fieldStack} />
           </div>
           <div className="flex-[3]" />
           {nakiTarget && (
