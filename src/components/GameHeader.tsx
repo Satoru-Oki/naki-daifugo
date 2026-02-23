@@ -128,7 +128,7 @@ export default function GameHeader({
     <>
       <div className="flex items-center px-3.5 py-2 gap-2 transition-colors duration-500"
         style={{ backgroundColor: "var(--bg-mid, #256b35)", borderBottom: "1px solid var(--bg-darker, #1a5a2e)" }}>
-        <span className="text-xl font-bold text-white/90 tracking-wider">OREHANIGEKIRU</span>
+        <span className="text-xs sm:text-xl font-bold text-white/90 tracking-wider">OREHANIGEKIRU</span>
         <button
           onClick={() => setShowRules(true)}
           className="inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full border border-white/30 text-white/50 hover:text-white hover:border-white/60 -ml-1"
