@@ -105,7 +105,7 @@ export default function Field({ cards, stack = [] }: FieldProps) {
   const hasCurrent = cards.length > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80px] relative mt-4 sm:mt-2">
+    <div className="flex flex-col items-center justify-center min-h-[80px] relative mt-4 sm:mt-6">
       {/* Green felt effect */}
       <div className="absolute inset-4 rounded-[60px]"
         style={{ background: "radial-gradient(ellipse at center, rgba(34,85,51,0.15), transparent 70%)" }}

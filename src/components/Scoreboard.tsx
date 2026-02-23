@@ -204,9 +204,9 @@ export default function Scoreboard({ scores, myId }: ScoreboardProps) {
       <table className="flex-1 ml-10 text-sm">
         <thead>
           <tr className="text-white/50 border-b border-white/10">
-            <th className="text-right py-1 font-semibold w-6">#</th>
-            <th className="text-left py-1 font-semibold pl-2">Player</th>
-            <th className="text-left py-1 font-semibold pl-3">
+            <th className="text-right py-1 sm:py-0.5 font-semibold w-6">#</th>
+            <th className="text-left py-1 sm:py-0.5 font-semibold pl-2">Player</th>
+            <th className="text-left py-1 sm:py-0.5 font-semibold pl-3">
               Score
               <button
                 onClick={() => setShowRules(true)}
@@ -226,9 +226,9 @@ export default function Scoreboard({ scores, myId }: ScoreboardProps) {
                 key={s.id}
                 className={isMe ? "text-amber-400" : "text-white/70"}
               >
-                <td className="text-right py-1">{i + 1}</td>
-                <td className="py-1 pl-2">{s.name}{isMe ? " (you)" : ""}</td>
-                <td className="text-left py-1 font-bold pl-3">{s.score > 0 ? `+${s.score}` : s.score}</td>
+                <td className="text-right py-1 sm:py-0.5">{i + 1}</td>
+                <td className="py-1 sm:py-0.5 pl-2">{s.name}{isMe ? " (you)" : ""}</td>
+                <td className="text-left py-1 sm:py-0.5 font-bold pl-3">{s.score > 0 ? `+${s.score}` : s.score}</td>
               </tr>
             );
           })}
