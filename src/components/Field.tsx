@@ -9,7 +9,7 @@ interface FieldProps {
 }
 
 /** カード群を描画（重ね表示対応） */
-function CardGroup({ cards, opacity }: { cards: GameCard[]; opacity?: string }) {
+function CardGroup({ cards, opacity, size = "md" }: { cards: GameCard[]; opacity?: string; size?: "md" | "lg" }) {
   const count = cards.length;
   const overlap = count >= 4;
   const overlapOffset = count >= 6 ? 18 : count >= 4 ? 22 : 0;
@@ -25,7 +25,7 @@ function CardGroup({ cards, opacity }: { cards: GameCard[]; opacity?: string }) 
               zIndex: i,
             }}
           >
-            <PlayingCard card={c} size="md" />
+            <PlayingCard card={c} size={size} />
           </div>
         ))}
       </div>
@@ -34,35 +34,49 @@ function CardGroup({ cards, opacity }: { cards: GameCard[]; opacity?: string }) 
 
   return (
     <div className={`flex gap-1.5 items-center ${opacity ?? ""}`}>
-      {cards.map((c) => <PlayingCard key={c.id} card={c} size="md" />)}
+      {cards.map((c) => <PlayingCard key={c.id} card={c} size={size} />)}
+    </div>
+  );
+}
+
+/** 現在 + 直前カードのセット */
+function FieldStack({ cards, prevCards, size }: { cards: GameCard[]; prevCards: GameCard[]; size: "md" | "lg" }) {
+  const hasPrev = prevCards.length > 0;
+  return (
+    <div className="relative">
+      {hasPrev && (
+        <div className="absolute left-1/2 -translate-x-1/2 -top-6 z-0">
+          <CardGroup cards={prevCards} size={size} />
+        </div>
+      )}
+      <div className="relative z-10">
+        <CardGroup cards={cards} size={size} />
+      </div>
     </div>
   );
 }
 
 export default function Field({ cards, prevCards = [] }: FieldProps) {
-  const hasPrev = prevCards.length > 0;
   const hasCurrent = cards.length > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80px] relative mt-2">
+    <div className="flex flex-col items-center justify-center min-h-[80px] relative mt-4 sm:mt-2">
       {/* Green felt effect */}
       <div className="absolute inset-4 rounded-[60px]"
         style={{ background: "radial-gradient(ellipse at center, rgba(34,85,51,0.15), transparent 70%)" }}
       />
       <div className="relative z-[1] min-h-[68px] flex items-center justify-center">
         {hasCurrent ? (
-          <div className="relative">
-            {/* 直前のカード（少し上にずらして薄く表示） */}
-            {hasPrev && (
-              <div className="absolute left-1/2 -translate-x-1/2 -top-3 z-0">
-                <CardGroup cards={prevCards} opacity="opacity-35" />
-              </div>
-            )}
-            {/* 現在のカード */}
-            <div className="relative z-10">
-              <CardGroup cards={cards} />
+          <>
+            {/* スマホ: lg サイズ */}
+            <div className="sm:hidden">
+              <FieldStack cards={cards} prevCards={prevCards} size="lg" />
             </div>
-          </div>
+            {/* PC: md サイズ */}
+            <div className="hidden sm:block">
+              <FieldStack cards={cards} prevCards={prevCards} size="md" />
+            </div>
+          </>
         ) : (
           <div className="text-white/10 text-sm font-semibold px-8 py-5 rounded-xl border border-dashed border-white/5">
             場にカードなし
