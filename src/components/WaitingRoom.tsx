@@ -7,6 +7,7 @@ import type { ChatMessage } from "@/lib/types";
 import type { VoiceUser } from "@/lib/webrtc";
 import { ChatPanel } from "./GameUI";
 import VoicePanel from "./VoicePanel";
+import { ScoringRulesContent } from "./Scoreboard";
 
 interface WaitingRoomProps {
   roomInfo: RoomInfo;
@@ -121,6 +122,12 @@ export default function WaitingRoom({
               <span className="text-sm text-[#3a5a3e]">待機中...</span>
             </div>
           ))}
+        </div>
+
+        {/* スコア・ルール */}
+        <div className="mt-4 bg-[#1a2e1e] border border-[#2a4a30] rounded-xl p-4 text-white text-sm">
+          <h3 className="font-bold text-base mb-3">得点ルール</h3>
+          <ScoringRulesContent />
         </div>
 
         {/* ボイスチャット */}

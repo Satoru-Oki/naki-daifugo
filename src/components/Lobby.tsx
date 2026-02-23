@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { clearLastRoom, getLastRoom, type LastRoomInfo } from "@/lib/socket";
 import { AVATARS } from "../../shared/constants";
+import { ScoringRulesContent } from "./Scoreboard";
 
 interface LobbyProps {
   onJoinRoom: (playerName: string, roomId: string, avatar?: string) => void;
@@ -203,6 +204,12 @@ export default function Lobby({ onJoinRoom }: LobbyProps) {
             </button>
           </div>
         )}
+      </div>
+
+      {/* スコア・ルール */}
+      <div className="w-full mt-8 bg-[#1a3a24] rounded-2xl p-5 text-white text-sm">
+        <h3 className="font-bold text-base mb-3">得点ルール</h3>
+        <ScoringRulesContent />
       </div>
 
       {/* フッター */}

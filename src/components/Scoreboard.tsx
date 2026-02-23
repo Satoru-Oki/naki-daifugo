@@ -8,6 +8,74 @@ interface ScoreboardProps {
   myId: string;
 }
 
+/** スコア・ルール内容（インライン表示用） */
+export function ScoringRulesContent() {
+  return (
+    <>
+      <h4 className="font-semibold mb-1 text-amber-400">ランク基本点</h4>
+      <table className="w-full text-xs mb-3 border-collapse">
+        <thead>
+          <tr className="text-white/50 border-b border-white/10">
+            <th className="text-left py-1">階級</th>
+            <th className="text-center py-1">5人</th>
+            <th className="text-center py-1">4人</th>
+            <th className="text-center py-1">3人</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-b border-white/5">
+            <td className="py-1">大富豪</td>
+            <td className="text-center">7</td>
+            <td className="text-center">5</td>
+            <td className="text-center">4</td>
+          </tr>
+          <tr className="border-b border-white/5">
+            <td className="py-1">富豪</td>
+            <td className="text-center">4</td>
+            <td className="text-center">3</td>
+            <td className="text-center">-</td>
+          </tr>
+          <tr className="border-b border-white/5">
+            <td className="py-1">平民</td>
+            <td className="text-center">2</td>
+            <td className="text-center">-</td>
+            <td className="text-center">2</td>
+          </tr>
+          <tr className="border-b border-white/5">
+            <td className="py-1">貧民</td>
+            <td className="text-center">1</td>
+            <td className="text-center">1</td>
+            <td className="text-center">-</td>
+          </tr>
+          <tr>
+            <td className="py-1">大貧民</td>
+            <td className="text-center">0</td>
+            <td className="text-center">0</td>
+            <td className="text-center">0</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4 className="font-semibold mb-1 text-amber-400">ボーナス点</h4>
+      <ul className="text-xs space-y-2 text-white/80">
+        <li>
+          <span className="font-semibold text-white">下剋上ボーナス</span>
+          <br />
+          前ラウンド大貧民 → 大富豪: <span className="text-green-400 font-bold">+10点</span>
+          <br />
+          前ラウンド大貧民 → 富豪: <span className="text-green-400 font-bold">+7点</span>
+        </li>
+        <li>
+          <span className="font-semibold text-white">ノー強カードボーナス</span>
+          <br />
+          手札（交換後）にJoker・2が一切なく、大富豪 or 富豪で終了:
+          <span className="text-green-400 font-bold"> +3点</span>
+        </li>
+      </ul>
+    </>
+  );
+}
+
 function ScoringRulesModal({ onClose }: { onClose: () => void }) {
   return (
     <div
@@ -27,67 +95,7 @@ function ScoringRulesModal({ onClose }: { onClose: () => void }) {
             &times;
           </button>
         </div>
-
-        <h4 className="font-semibold mb-1 text-amber-400">ランク基本点</h4>
-        <table className="w-full text-xs mb-3 border-collapse">
-          <thead>
-            <tr className="text-white/50 border-b border-white/10">
-              <th className="text-left py-1">階級</th>
-              <th className="text-center py-1">5人</th>
-              <th className="text-center py-1">4人</th>
-              <th className="text-center py-1">3人</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-white/5">
-              <td className="py-1">大富豪</td>
-              <td className="text-center">7</td>
-              <td className="text-center">5</td>
-              <td className="text-center">4</td>
-            </tr>
-            <tr className="border-b border-white/5">
-              <td className="py-1">富豪</td>
-              <td className="text-center">4</td>
-              <td className="text-center">3</td>
-              <td className="text-center">-</td>
-            </tr>
-            <tr className="border-b border-white/5">
-              <td className="py-1">平民</td>
-              <td className="text-center">2</td>
-              <td className="text-center">-</td>
-              <td className="text-center">2</td>
-            </tr>
-            <tr className="border-b border-white/5">
-              <td className="py-1">貧民</td>
-              <td className="text-center">1</td>
-              <td className="text-center">1</td>
-              <td className="text-center">-</td>
-            </tr>
-            <tr>
-              <td className="py-1">大貧民</td>
-              <td className="text-center">0</td>
-              <td className="text-center">0</td>
-              <td className="text-center">0</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <h4 className="font-semibold mb-1 text-amber-400">ボーナス点</h4>
-        <ul className="text-xs space-y-2 text-white/80">
-          <li>
-            <span className="font-semibold text-white">下剋上ボーナス</span>
-            <br />
-            前ラウンド大貧民 → 大富豪: <span className="text-green-400 font-bold">+10点</span>
-            <br />
-            前ラウンド大貧民 → 富豪: <span className="text-green-400 font-bold">+7点</span>
-          </li>
-          <li>
-            <span className="font-semibold text-white">ノー強カードボーナス</span>
-            <br />
-            手札（交換後）にJoker・2が一切なく、大富豪 or 富豪で終了:
-            <span className="text-green-400 font-bold"> +3点</span>
-          </li>
-        </ul>
+        <ScoringRulesContent />
       </div>
     </div>
   );
