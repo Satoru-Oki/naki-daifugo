@@ -233,6 +233,7 @@ export class GameEngine {
     nakiChance?: boolean;
     revolution?: boolean;
     eightCut?: boolean;
+    eightCutCards?: GameCard[];
     elevenBack?: boolean;
     playerFinished?: boolean;
   } {
@@ -385,7 +386,7 @@ export class GameEngine {
       if (playerFinished) {
         this.advanceTurn();
       }
-      return { success: true, eightCut, elevenBack, revolution, playerFinished };
+      return { success: true, eightCut, eightCutCards: cards, elevenBack, revolution, playerFinished };
     }
 
     // 鳴きチャンスチェック

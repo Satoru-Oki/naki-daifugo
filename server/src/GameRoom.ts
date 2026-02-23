@@ -370,7 +370,7 @@ export class GameRoom {
       }
 
       if (result.eightCut) {
-        this.broadcast("notification", { message: "✂️ 8切り！" });
+        this.broadcast("notification", { message: "✂️ 8切り！", cards: result.eightCutCards });
       }
 
       if (result.playerFinished) {

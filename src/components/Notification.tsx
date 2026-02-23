@@ -1,5 +1,8 @@
 "use client";
 
+import type { GameCard } from "@/lib/types";
+import PlayingCard from "./PlayingCard";
+
 interface NotificationProps {
   message: string;
 }
@@ -16,7 +19,7 @@ export default function Notification({ message }: NotificationProps) {
 }
 
 /** 派手な全画面アナウンス（鳴き・革命・都落ち・8切り用） */
-export function BigAnnouncement({ message, type }: { message: string; type: "naki" | "revolution" | "miyakoOchi" | "eightCut" }) {
+export function BigAnnouncement({ message, type, cards }: { message: string; type: "naki" | "revolution" | "miyakoOchi" | "eightCut"; cards?: GameCard[] }) {
   if (!message) return null;
 
   const colors = type === "revolution"
@@ -40,10 +43,18 @@ export function BigAnnouncement({ message, type }: { message: string; type: "nak
       <div className={`
         bg-gradient-to-r ${colors} border-2 rounded-2xl px-10 py-5 shadow-2xl
         animate-[announceIn_0.3s_ease-out]
+        flex flex-col items-center gap-3
       `}>
         <div className={`text-2xl font-black ${textColor} whitespace-nowrap drop-shadow-lg`}>
           {message}
         </div>
+        {type === "eightCut" && cards && cards.length > 0 && (
+          <div className="flex gap-1.5 items-center">
+            {cards.map((c) => (
+              <PlayingCard key={c.id} card={c} size="md" />
+            ))}
+          </div>
+        )}
       </div>
       <style>{`
         @keyframes announceIn {

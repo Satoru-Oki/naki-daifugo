@@ -183,7 +183,7 @@ function SideAvatar({ player, side }: { player: Player; side: "left" | "right" }
     <div className={`flex flex-col items-center ${dimmed}`}>
       <PlayerLabel player={player} />
       {/* カード領域 + アイコン中央重ね */}
-      <div className="relative mt-0.5">
+      <div className="relative mt-0.5 w-[90px]">
         {player.cardCount > 0 && (
           <VerticalFan count={player.cardCount} side={side} />
         )}

@@ -36,6 +36,8 @@ export default function GamePage() {
   const [hand, setHand] = useState<GameCard[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [field, setField] = useState<GameCard[]>([]);
+  const [prevField, setPrevField] = useState<GameCard[]>([]);
+  const fieldRef = useRef<GameCard[]>([]);
   const [history, setHistory] = useState<GameCard[]>([]);
   const [currentTurn, setCurrentTurn] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
@@ -63,7 +65,7 @@ export default function GamePage() {
   const [inVoice, setInVoice] = useState(false);
   const [micEnabled, setMicEnabled] = useState(true);
   const [speakerEnabled, setSpeakerEnabled] = useState(true);
-  const [announcement, setAnnouncement] = useState<{ message: string; type: "naki" | "revolution" | "miyakoOchi" | "eightCut" } | null>(null);
+  const [announcement, setAnnouncement] = useState<{ message: string; type: "naki" | "revolution" | "miyakoOchi" | "eightCut"; cards?: GameCard[] } | null>(null);
   const [connected, setConnected] = useState(true);
   const prevPhaseRef = useRef<string>("");
   const prevTurnRef = useRef<string>("");
@@ -75,9 +77,9 @@ export default function GamePage() {
     setTimeout(() => setNote(""), 5000);
   }, []);
 
-  const announce = useCallback((message: string, type: "naki" | "revolution" | "miyakoOchi" | "eightCut") => {
-    setAnnouncement({ message, type });
-    setTimeout(() => setAnnouncement(null), 2000);
+  const announce = useCallback((message: string, type: "naki" | "revolution" | "miyakoOchi" | "eightCut", cards?: GameCard[]) => {
+    setAnnouncement({ message, type, cards });
+    setTimeout(() => setAnnouncement(null), 3000);
   }, []);
 
   // Socketイベントリスナー登録
@@ -146,6 +148,18 @@ export default function GamePage() {
       const sorted = sortHand(state.hand, false);
       handRef.current = sorted;
       setHand(sorted);
+      // 場のカードが変わったら直前の場を保存
+      const prevIds = fieldRef.current.map(c => c.id).join(",");
+      const newIds = state.field.map((c: GameCard) => c.id).join(",");
+      if (newIds !== prevIds) {
+        // 場が空になった（流れた）場合はprevFieldもクリア
+        if (state.field.length === 0) {
+          setPrevField([]);
+        } else {
+          setPrevField(fieldRef.current);
+        }
+      }
+      fieldRef.current = state.field;
       setField(state.field);
       setHistory(state.history);
       setCurrentTurn(state.currentTurn);
@@ -215,9 +229,9 @@ export default function GamePage() {
       }
     });
 
-    socket.on("notification", (data: { message: string }) => {
+    socket.on("notification", (data: { message: string; cards?: GameCard[] }) => {
       if (data.message.includes("8切り")) {
-        announce("✂️ 8切り！", "eightCut");
+        announce("✂️ 8切り！", "eightCut", data.cards);
         return;
       }
       notify(data.message);
@@ -500,7 +514,7 @@ export default function GamePage() {
             接続が切れています…再接続中
           </div>
         )}
-        {announcement && <BigAnnouncement message={announcement.message} type={announcement.type} />}
+        {announcement && <BigAnnouncement message={announcement.message} type={announcement.type} cards={announcement.cards} />}
         {joinRequestFrom && (
           <JoinRequestPopup
             playerName={joinRequestFrom}
@@ -527,7 +541,7 @@ export default function GamePage() {
           <div className="flex-[2]" />
           <div className="relative shrink-0">
             <SideOpponents players={players} />
-            <Field cards={field} />
+            <Field cards={field} prevCards={prevField} />
           </div>
           <div className="flex-[3]" />
           {nakiTarget && (
