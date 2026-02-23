@@ -117,7 +117,7 @@ export default function Field({ cards, stack = [] }: FieldProps) {
               <FieldPile cards={cards} stack={stack} size="xl" />
             </div>
             <div className="hidden sm:block">
-              <FieldPile cards={cards} stack={stack} size="md" />
+              <FieldPile cards={cards} stack={stack} size="lg" />
             </div>
           </>
         ) : (

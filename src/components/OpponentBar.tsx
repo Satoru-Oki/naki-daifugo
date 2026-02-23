@@ -193,10 +193,13 @@ function TopAvatar({ player }: { player: Player }) {
 function SideAvatar({ player, side }: { player: Player; side: "left" | "right" }) {
   const dimmed = player.passed ? "opacity-40" : "";
   return (
-    <div className={`flex flex-col items-center ${dimmed}`}>
-      <PlayerLabel player={player} />
-      {/* カード領域 + アイコン中央重ね */}
-      <div className="relative mt-0.5 w-[90px] min-h-[80px]">
+    <div className={`${dimmed}`}>
+      {/* カード領域 + アイコン中央重ね（固定幅で名前の長さに影響されない） */}
+      <div className="relative w-[90px] min-h-[80px]">
+        {/* 名前ラベル（absoluteでレイアウトに影響しない） */}
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 whitespace-nowrap z-10">
+          <PlayerLabel player={player} />
+        </div>
         {player.cardCount > 0 && (
           <VerticalFan count={player.cardCount} side={side} />
         )}
