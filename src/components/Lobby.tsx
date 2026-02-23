@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { clearLastRoom, getLastRoom, type LastRoomInfo } from "@/lib/socket";
 import { AVATARS } from "../../shared/constants";
-import { ScoringRulesContent } from "./Scoreboard";
+import { ScoringRulesModal, GameRulesModal } from "./Scoreboard";
 
 interface LobbyProps {
   onJoinRoom: (playerName: string, roomId: string, avatar?: string) => void;
@@ -20,6 +20,8 @@ export default function Lobby({ onJoinRoom }: LobbyProps) {
   const [mode, setMode] = useState<"menu" | "join">("menu");
   const [lastRoom, setLastRoom] = useState<LastRoomInfo | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string | undefined>(undefined);
+  const [showScoring, setShowScoring] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   // クライアント側でのみlocalStorageを読む（SSR不一致回避）
   // ルームが存在するかAPIで確認し、存在しなければlocalStorageをクリア
@@ -206,11 +208,25 @@ export default function Lobby({ onJoinRoom }: LobbyProps) {
         )}
       </div>
 
-      {/* スコア・ルール */}
-      <div className="w-full mt-8 bg-[#1a3a24] rounded-2xl p-5 text-white text-sm">
-        <h3 className="font-bold text-base mb-3">得点ルール</h3>
-        <ScoringRulesContent />
+      {/* ルールボタン */}
+      <div className="mt-8 flex items-center gap-5">
+        <button
+          onClick={() => setShowRules(true)}
+          className="flex items-center gap-1.5 text-white/60 hover:text-white/90 transition-colors text-sm"
+        >
+          <span className="inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full border border-white/40 font-bold">?</span>
+          Rules
+        </button>
+        <button
+          onClick={() => setShowScoring(true)}
+          className="flex items-center gap-1.5 text-white/60 hover:text-white/90 transition-colors text-sm"
+        >
+          <span className="inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full border border-white/40 font-bold">?</span>
+          Score
+        </button>
       </div>
+      {showRules && <GameRulesModal onClose={() => setShowRules(false)} />}
+      {showScoring && <ScoringRulesModal onClose={() => setShowScoring(false)} />}
 
       {/* フッター */}
       <p className="mt-10 text-[10px] text-white/50 tracking-wider">

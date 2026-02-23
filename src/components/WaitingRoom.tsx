@@ -7,7 +7,7 @@ import type { ChatMessage } from "@/lib/types";
 import type { VoiceUser } from "@/lib/webrtc";
 import { ChatPanel } from "./GameUI";
 import VoicePanel from "./VoicePanel";
-import { ScoringRulesContent } from "./Scoreboard";
+import { ScoringRulesModal, GameRulesModal } from "./Scoreboard";
 
 interface WaitingRoomProps {
   roomInfo: RoomInfo;
@@ -35,6 +35,8 @@ export default function WaitingRoom({
   const isHost = me?.isHost ?? false;
   const canStart = isHost && roomInfo.players.length >= 3;
   const [chatOpen, setChatOpen] = useState(false);
+  const [showScoring, setShowScoring] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   return (
     <div className="max-w-[430px] mx-auto min-h-dvh bg-[#0f1e14] text-gray-300
@@ -124,11 +126,25 @@ export default function WaitingRoom({
           ))}
         </div>
 
-        {/* スコア・ルール */}
-        <div className="mt-4 bg-[#1a2e1e] border border-[#2a4a30] rounded-xl p-4 text-white text-sm">
-          <h3 className="font-bold text-base mb-3">得点ルール</h3>
-          <ScoringRulesContent />
+        {/* ルールボタン */}
+        <div className="mt-4 flex items-center gap-5">
+          <button
+            onClick={() => setShowRules(true)}
+            className="flex items-center gap-1.5 text-[#6a7a64] hover:text-white/80 transition-colors text-sm"
+          >
+            <span className="inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full border border-[#6a7a64] font-bold">?</span>
+            Rules
+          </button>
+          <button
+            onClick={() => setShowScoring(true)}
+            className="flex items-center gap-1.5 text-[#6a7a64] hover:text-white/80 transition-colors text-sm"
+          >
+            <span className="inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full border border-[#6a7a64] font-bold">?</span>
+            Score
+          </button>
         </div>
+        {showRules && <GameRulesModal onClose={() => setShowRules(false)} />}
+        {showScoring && <ScoringRulesModal onClose={() => setShowScoring(false)} />}
 
         {/* ボイスチャット */}
         <VoicePanel

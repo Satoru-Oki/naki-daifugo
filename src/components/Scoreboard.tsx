@@ -76,7 +76,7 @@ export function ScoringRulesContent() {
   );
 }
 
-function ScoringRulesModal({ onClose }: { onClose: () => void }) {
+export function ScoringRulesModal({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
@@ -96,6 +96,72 @@ function ScoringRulesModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <ScoringRulesContent />
+      </div>
+    </div>
+  );
+}
+
+/** ゲームルールモーダル */
+export function GameRulesModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#1a2e1a] border border-white/20 rounded-lg p-4 mx-4 max-w-sm w-full max-h-[80vh] overflow-y-auto text-white text-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-bold text-base">ゲームルール</h3>
+          <button
+            onClick={onClose}
+            className="text-white/50 hover:text-white text-lg leading-none px-1"
+          >
+            &times;
+          </button>
+        </div>
+
+        <h4 className="font-semibold mb-1 text-amber-400">基本</h4>
+        <ul className="text-xs space-y-1 text-white/80 mb-3 list-disc pl-4">
+          <li>3〜5人、54枚（52枚+ジョーカー2枚）</li>
+          <li>手札を全て出し切った順に順位が決定</li>
+          <li>初回は♥7持ちが先攻</li>
+        </ul>
+
+        <h4 className="font-semibold mb-1 text-amber-400">カードの強さ</h4>
+        <p className="text-xs text-white/80 mb-1">3 &lt; 4 &lt; ... &lt; K &lt; A &lt; 2 &lt; Joker</p>
+        <p className="text-xs text-white/60 mb-3">革命時は逆順（Jokerは常に最強、♠3で切れる）</p>
+
+        <h4 className="font-semibold mb-1 text-amber-400">出し方</h4>
+        <ul className="text-xs space-y-1 text-white/80 mb-3 list-disc pl-4">
+          <li>単体 / ペア / トリプル / 4枚組 / 連番（同スート3枚以上）</li>
+          <li>場と同枚数でより強いカードを出す</li>
+          <li>パスしたら場が流れるまで出せない</li>
+          <li>全員パスで場が流れる</li>
+        </ul>
+
+        <h4 className="font-semibold mb-1 text-amber-400">特殊ルール</h4>
+        <ul className="text-xs space-y-1.5 text-white/80 mb-3 list-disc pl-4">
+          <li><span className="text-white font-semibold">8切り:</span> 8を含むカードで場が流れる</li>
+          <li><span className="text-white font-semibold">イレブンバック:</span> Jを含むカードで強さ一時逆転</li>
+          <li><span className="text-white font-semibold">革命:</span> 同ランク4枚 or 連番4枚以上で強さ逆転</li>
+        </ul>
+
+        <h4 className="font-semibold mb-1 text-amber-400">鳴き（インターセプト）</h4>
+        <ul className="text-xs space-y-1 text-white/80 mb-3 list-disc pl-4">
+          <li>単体出し時のみ、対象ランク 6〜Q</li>
+          <li>同スートの前後カードを持っていれば鳴ける</li>
+          <li>例: ♠7が出たら♠6と♠8で鳴き → ♠6-7-8</li>
+          <li>鳴き後、場が流れて鳴いた人のターンに</li>
+        </ul>
+
+        <h4 className="font-semibold mb-1 text-amber-400">カード交換（2ラウンド目〜）</h4>
+        <ul className="text-xs space-y-1 text-white/80 list-disc pl-4">
+          <li>大富豪 ↔ 大貧民: 2枚交換</li>
+          <li>富豪 ↔ 貧民: 1枚交換</li>
+          <li>下位は最強カードを渡し、上位は不要カードを渡す</li>
+        </ul>
       </div>
     </div>
   );
