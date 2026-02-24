@@ -35,13 +35,16 @@ function CardGroup({ cards, size = "md" }: { cards: GameCard[]; size?: "md" | "l
     );
   }
 
-  const spread = 8;
+  const spread = 5;
+  // 扇形の視覚的中心を場の中央に合わせるため、枚数に応じて右にオフセット
+  const offsetX = (count - 1) * 10;
 
   return (
     <div className="relative"
       style={{
-        width: size === "xl" ? 72 : size === "lg" ? 60 : 48,
-        height: size === "xl" ? 101 : size === "lg" ? 84 : 67,
+        width: size === "xl" ? 84 : size === "lg" ? 60 : 48,
+        height: size === "xl" ? 118 : size === "lg" ? 84 : 67,
+        transform: count > 1 ? `translateX(${offsetX}px)` : undefined,
       }}
     >
       {cards.map((c, i) => (
@@ -49,7 +52,7 @@ function CardGroup({ cards, size = "md" }: { cards: GameCard[]; size?: "md" | "l
           key={c.id}
           className="absolute left-0 bottom-0"
           style={{
-            transformOrigin: "left bottom",
+            transformOrigin: "0% 250%",
             transform: `rotate(${(i - count + 1) * spread}deg)`,
             zIndex: i,
           }}

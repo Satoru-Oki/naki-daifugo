@@ -40,7 +40,7 @@ const BASE = {
   sm: { width: 32, height: 45 },
   md: { width: 48, height: 67 },
   lg: { width: 60, height: 84 },
-  xl: { width: 72, height: 101 },
+  xl: { width: 84, height: 118 },
 };
 
 const SIZES = Object.fromEntries(
