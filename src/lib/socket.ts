@@ -111,9 +111,14 @@ export function disconnectAndClearSession(): void {
 
 let keepAliveWorker: Worker | null = null;
 let httpKeepAliveTimer: ReturnType<typeof setInterval> | null = null;
+let keepAliveConnectHandler: (() => void) | null = null;
+let keepAliveDisconnectHandler: (() => void) | null = null;
+let keepAliveSocket: GameSocket | null = null;
 
 export function startKeepAlive(s: GameSocket): void {
   stopKeepAlive();
+
+  keepAliveSocket = s;
 
   // Web Worker起動
   try {
@@ -131,9 +136,11 @@ export function startKeepAlive(s: GameSocket): void {
   // visibilitychange: タブ復帰時に接続チェック
   document.addEventListener("visibilitychange", handleVisibility);
 
-  // socket接続/切断でWorker制御
-  s.on("connect", () => keepAliveWorker?.postMessage("start"));
-  s.on("disconnect", () => keepAliveWorker?.postMessage("stop"));
+  // socket接続/切断でWorker制御（参照を保持してクリーンアップ可能に）
+  keepAliveConnectHandler = () => keepAliveWorker?.postMessage("start");
+  keepAliveDisconnectHandler = () => keepAliveWorker?.postMessage("stop");
+  s.on("connect", keepAliveConnectHandler);
+  s.on("disconnect", keepAliveDisconnectHandler);
 
   if (s.connected) keepAliveWorker?.postMessage("start");
 }
@@ -170,6 +177,15 @@ function handleVisibility(): void {
 }
 
 export function stopKeepAlive(): void {
+  // socketリスナーをクリーンアップ（蓄積を防止）
+  if (keepAliveSocket) {
+    if (keepAliveConnectHandler) keepAliveSocket.off("connect", keepAliveConnectHandler);
+    if (keepAliveDisconnectHandler) keepAliveSocket.off("disconnect", keepAliveDisconnectHandler);
+    keepAliveSocket = null;
+  }
+  keepAliveConnectHandler = null;
+  keepAliveDisconnectHandler = null;
+
   keepAliveWorker?.postMessage("stop");
   keepAliveWorker?.terminate();
   keepAliveWorker = null;

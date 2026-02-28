@@ -172,8 +172,9 @@ async function main() {
           }
         }
 
-        // 旧ソケットがまだ接続中なら強制切断（ハンドラは無効化済みなので安全）
+        // 旧ソケットがまだ接続中なら通知を送ってから強制切断
         if (existingPlayer.socket.connected) {
+          existingPlayer.socket.emit("replaced");
           existingPlayer.socket.disconnect(true);
         }
 

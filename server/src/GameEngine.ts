@@ -49,6 +49,7 @@ export class GameEngine {
   pendingEightCut = false;
   pendingElevenBack = false;
   spade3CutPending = false;
+  eightCutPending = false;
   finishCounter = 0;
   exchangeState: Map<string, ExchangeEntry> = new Map();
   prevDaifugoId: string | null = null;
@@ -212,6 +213,7 @@ export class GameEngine {
     this.nakiCount = 0;
     this.pendingEightCut = false;
     this.pendingElevenBack = false;
+    this.eightCutPending = false;
     this.finishCounter = 0;
     this.currentTurnIndex = 0;
     this.isRevolution = false;
@@ -252,6 +254,7 @@ export class GameEngine {
   } {
     if (this.phase !== "playing") return { success: false, error: "現在カードを出せません" };
     if (this.spade3CutPending) return { success: false, error: "♠3カット演出中です" };
+    if (this.eightCutPending) return { success: false, error: "8切り演出中です" };
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { success: false, error: "プレイヤーが見つかりません" };
     if (this.currentPlayer.id !== playerId) return { success: false, error: "あなたのターンではありません" };
@@ -444,15 +447,9 @@ export class GameEngine {
       elevenBack = true;
     }
 
-    // 8切り: 場を流し、出したプレイヤーのターンに
+    // 8切り: 場のクリアは GameRoom が broadcastGameState 後に行う（革命との併発時に場のカードを表示するため）
     if (eightCut) {
-      this.discardPile.push(...this.field);
-      this.field = [];
-      this.fieldType = "single";
-      this.isElevenBack = false;
-      this.players.forEach((p) => {
-        if (!p.finished) p.passed = false;
-      });
+      this.eightCutPending = true;
       // 上がっていなければそのまま自分のターン、上がっていれば次へ
       if (playerFinished) {
         this.advanceTurn();
@@ -530,6 +527,7 @@ export class GameEngine {
   doPass(playerId: string): { success: boolean; error?: string; fieldCleared?: boolean } {
     if (this.phase !== "playing") return { success: false, error: "現在パスできません" };
     if (this.spade3CutPending) return { success: false, error: "♠3カット演出中です" };
+    if (this.eightCutPending) return { success: false, error: "8切り演出中です" };
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { success: false, error: "プレイヤーが見つかりません" };
     if (this.currentPlayer.id !== playerId) return { success: false, error: "あなたのターンではありません" };
@@ -598,6 +596,19 @@ export class GameEngine {
   resolveSpade3Cut(): void {
     if (!this.spade3CutPending) return;
     this.spade3CutPending = false;
+    this.discardPile.push(...this.field);
+    this.field = [];
+    this.fieldType = "single";
+    this.isElevenBack = false;
+    this.players.forEach((p) => {
+      if (!p.finished) p.passed = false;
+    });
+  }
+
+  /** 8切り演出解決: 場をクリアして次のターンへ */
+  resolveEightCut(): void {
+    if (!this.eightCutPending) return;
+    this.eightCutPending = false;
     this.discardPile.push(...this.field);
     this.field = [];
     this.fieldType = "single";
@@ -711,9 +722,12 @@ export class GameEngine {
     this.nakiCount = 0;
     this.pendingEightCut = false;
     this.pendingElevenBack = false;
+    this.spade3CutPending = false;
+    this.eightCutPending = false;
     this.finishCounter = 0;
     this.isRevolution = false;
     this.isElevenBack = false;
+    this.miyakoOchiResult = null;
 
     const deck = shuffle(createDeck());
     const numPlayers = this.players.length;

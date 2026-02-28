@@ -35,6 +35,7 @@ export interface ServerToClientEvents {
   player_left: (data: { playerId: string }) => void;
   notification: (data: { message: string; cards?: GameCard[] }) => void;
   session_expired: () => void;
+  replaced: () => void;
   join_request: (data: { playerName: string }) => void;
   join_request_result: (data: { accepted: boolean; message: string }) => void;
   voice_stamp: (data: { fromId: string; fromName: string; stampId: string }) => void;

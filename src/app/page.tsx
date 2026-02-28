@@ -75,6 +75,7 @@ export default function GamePage() {
   const handRef = useRef<GameCard[]>([]);
   const notifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disconnectDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const notify = useCallback((text: string) => {
     if (notifyTimerRef.current) clearTimeout(notifyTimerRef.current);
@@ -104,22 +105,39 @@ export default function GamePage() {
     socket.off("notification");
     socket.off("game_error");
     socket.off("session_expired");
+    socket.off("replaced");
     socket.off("join_request");
     socket.off("join_request_result");
     socket.off("voice_stamp");
 
     // 接続状態の監視
     socket.on("connect", () => {
+      // デバウンスタイマーをキャンセル（短時間の切断→再接続では赤バナーを出さない）
+      if (disconnectDebounceRef.current) {
+        clearTimeout(disconnectDebounceRef.current);
+        disconnectDebounceRef.current = null;
+      }
       setConnected(true);
     });
     socket.on("disconnect", (reason) => {
       console.log(`[socket] disconnect reason=${reason}`);
-      setConnected(false);
-      if (reason === "io server disconnect" || reason === "transport close") {
-        // サーバー切断 or トランスポート断 → 即座に再接続試行
-        socket.connect();
+
+      if (reason === "io server disconnect") {
+        // サーバーが明示的に切断（名前マッチで別の接続に置き換えられた等）
+        // → 自動再接続しない。socket.connect()も呼ばない。
+        setConnected(false);
+        return;
       }
-      // その他の理由（ping timeout等）はSocket.ioが自動再接続する
+
+      // transport close / ping timeout 等 → Socket.ioが自動再接続する（バックオフ付き）
+      // 手動で socket.connect() を呼ぶとバックオフがリセットされ高速ループの原因になるため呼ばない
+      // 2秒のデバウンスで、すぐ再接続できれば赤バナーを表示しない
+      if (!disconnectDebounceRef.current) {
+        disconnectDebounceRef.current = setTimeout(() => {
+          disconnectDebounceRef.current = null;
+          setConnected(false);
+        }, 2000);
+      }
     });
 
     // セッション情報受信
@@ -329,6 +347,13 @@ export default function GamePage() {
         notify("セッションが切れました。ロビーに戻ります");
         setScreen("lobby");
       }
+    });
+
+    // 別の接続に置き換えられた（2タブ/2デバイスで同名プレイヤー）
+    socket.on("replaced", () => {
+      clearSessionId();
+      notify("別のデバイスまたはタブで接続されました");
+      setScreen("lobby");
     });
 
     // 参加要請を受信（既存メンバー側）

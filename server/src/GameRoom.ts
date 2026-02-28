@@ -35,6 +35,7 @@ export class GameRoom {
   private disconnectedPlayerIds = new Set<string>();
   private autoPassTimer: ReturnType<typeof setTimeout> | null = null;
   private spade3CutTimer: ReturnType<typeof setTimeout> | null = null;
+  private eightCutTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(io: Server, roomId: string, maxPlayers = 5) {
     this.io = io;
@@ -204,6 +205,10 @@ export class GameRoom {
       if (this.spade3CutTimer) {
         clearTimeout(this.spade3CutTimer);
         this.spade3CutTimer = null;
+      }
+      if (this.eightCutTimer) {
+        clearTimeout(this.eightCutTimer);
+        this.eightCutTimer = null;
       }
       this.engine.phase = "waiting";
       return;
@@ -422,6 +427,18 @@ export class GameRoom {
             this.scheduleAutoPass();
           }
         }, 3000);
+      } else if (result.eightCut) {
+        // 8切り: 場のカードを表示してから流す（革命との併発時に場が見えるようにする）
+        this.eightCutTimer = setTimeout(() => {
+          this.eightCutTimer = null;
+          this.engine.resolveEightCut();
+          this.broadcastGameState();
+          if (this.engine.phase === "round_end") {
+            this.endRound();
+          } else {
+            this.scheduleAutoPass();
+          }
+        }, 500);
       } else if (result.nakiChance) {
         this.startNakiWindow();
       } else if (this.engine.phase === "round_end") {
@@ -491,6 +508,11 @@ export class GameRoom {
 
     socket.on("skip_intercept", () => {
       if (this.engine.phase !== "naki_chance") return;
+      // 鳴ける人のみスキップを受け付ける
+      const enginePlayer = this.engine.players.find((p) => p.id === playerId);
+      if (!enginePlayer || enginePlayer.finished) return;
+      const card = this.engine.field[0];
+      if (!card || !canNaki(card, enginePlayer.hand).possible) return;
       const nakiResult = this.engine.resolveNakiWindow();
       if (nakiResult.eightCut) {
         this.broadcast("notification", { message: "✂️ 8切り！", cards: nakiResult.eightCutCards });
@@ -641,10 +663,15 @@ export class GameRoom {
     }
   }
 
-  /** 鳴きウィンドウ開始 */
+  /** 鳴きウィンドウ開始（鳴ける人のみに送信） */
   private startNakiWindow(): void {
     const card = this.engine.field[0];
-    this.io.to(this.id).emit("intercept_window", { card });
+    for (const rp of this.players) {
+      const ep = this.engine.players.find((p) => p.id === rp.id);
+      if (ep && !ep.finished && canNaki(card, ep.hand).possible) {
+        rp.socket.emit("intercept_window", { card });
+      }
+    }
   }
 
   /** 鳴きウィンドウを強制解決（切断時用） */
