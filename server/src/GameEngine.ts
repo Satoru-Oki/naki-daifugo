@@ -48,6 +48,7 @@ export class GameEngine {
   nakiCount = 0;
   pendingEightCut = false;
   pendingElevenBack = false;
+  spade3CutPending = false;
   finishCounter = 0;
   exchangeState: Map<string, ExchangeEntry> = new Map();
   prevDaifugoId: string | null = null;
@@ -250,6 +251,7 @@ export class GameEngine {
     spade3Cut?: boolean;
   } {
     if (this.phase !== "playing") return { success: false, error: "現在カードを出せません" };
+    if (this.spade3CutPending) return { success: false, error: "♠3カット演出中です" };
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { success: false, error: "プレイヤーが見つかりません" };
     if (this.currentPlayer.id !== playerId) return { success: false, error: "あなたのターンではありません" };
@@ -288,14 +290,10 @@ export class GameEngine {
         }
         // 手札から♠3を除去
         player.hand = player.hand.filter((c) => !cardIds.includes(c.id));
-        // ジョーカーと♠3をまとめて捨て札へ、場をクリア
-        this.discardPile.push(...this.field, ...cards);
-        this.field = [];
-        this.fieldType = "single";
-        this.isElevenBack = false;
-        this.players.forEach((p) => {
-          if (!p.finished) p.passed = false;
-        });
+        // ジョーカーを捨て札へ、♠3を場に表示（3秒後にGameRoomが流す）
+        this.discardPile.push(...this.field);
+        this.field = cards;
+        this.spade3CutPending = true;
         // 上がりチェック
         let playerFinished = false;
         let miyakoOchi: { playerId: string; playerName: string } | undefined;
@@ -531,6 +529,7 @@ export class GameEngine {
   /** パス */
   doPass(playerId: string): { success: boolean; error?: string; fieldCleared?: boolean } {
     if (this.phase !== "playing") return { success: false, error: "現在パスできません" };
+    if (this.spade3CutPending) return { success: false, error: "♠3カット演出中です" };
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { success: false, error: "プレイヤーが見つかりません" };
     if (this.currentPlayer.id !== playerId) return { success: false, error: "あなたのターンではありません" };
@@ -593,6 +592,19 @@ export class GameEngine {
 
     this.advanceTurn();
     return { eightCut: false, elevenBack };
+  }
+
+  /** ♠3カット演出解決: 場をクリアして次のターンへ */
+  resolveSpade3Cut(): void {
+    if (!this.spade3CutPending) return;
+    this.spade3CutPending = false;
+    this.discardPile.push(...this.field);
+    this.field = [];
+    this.fieldType = "single";
+    this.isElevenBack = false;
+    this.players.forEach((p) => {
+      if (!p.finished) p.passed = false;
+    });
   }
 
   /** 都落ちチェック: 前ラウンド大富豪以外が最初に上がったら即時発動 */

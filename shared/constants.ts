@@ -38,6 +38,7 @@ export const AVATARS: { file: string; label: string }[] = [
   { file: "morizono.JPG", label: "Morizono" },
   { file: "oki.jpg", label: "Oki" },
   { file: "sakai.JPG", label: "Sakai" },
+  { file: "suzuki1.jpg", label: "Suzuki" },
   { file: "syuji.jpg", label: "Syuji" },
   { file: "syujihome.jpg", label: "SyujiHome" },
 ];

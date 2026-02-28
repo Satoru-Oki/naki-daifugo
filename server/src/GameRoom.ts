@@ -34,6 +34,7 @@ export class GameRoom {
   private engineRemovalTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private disconnectedPlayerIds = new Set<string>();
   private autoPassTimer: ReturnType<typeof setTimeout> | null = null;
+  private spade3CutTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(io: Server, roomId: string, maxPlayers = 5) {
     this.io = io;
@@ -199,6 +200,10 @@ export class GameRoom {
       if (this.nextRoundTimer) {
         clearTimeout(this.nextRoundTimer);
         this.nextRoundTimer = null;
+      }
+      if (this.spade3CutTimer) {
+        clearTimeout(this.spade3CutTimer);
+        this.spade3CutTimer = null;
       }
       this.engine.phase = "waiting";
       return;
@@ -405,7 +410,19 @@ export class GameRoom {
 
       this.broadcastGameState();
 
-      if (result.nakiChance) {
+      if (result.spade3Cut) {
+        // ♠3を場に表示した状態で3秒待ってから流す
+        this.spade3CutTimer = setTimeout(() => {
+          this.spade3CutTimer = null;
+          this.engine.resolveSpade3Cut();
+          this.broadcastGameState();
+          if (this.engine.phase === "round_end") {
+            this.endRound();
+          } else {
+            this.scheduleAutoPass();
+          }
+        }, 3000);
+      } else if (result.nakiChance) {
         this.startNakiWindow();
       } else if (this.engine.phase === "round_end") {
         this.endRound();
