@@ -82,10 +82,10 @@ export default function GamePage() {
     notifyTimerRef.current = setTimeout(() => setNote(""), 5000);
   }, []);
 
-  const announce = useCallback((message: string, type: "naki" | "revolution" | "miyakoOchi" | "eightCut" | "daihinmin" | "daifugo" | "gekokujo", cards?: GameCard[], playerName?: string, playerAvatar?: string) => {
+  const announce = useCallback((message: string, type: "naki" | "revolution" | "miyakoOchi" | "eightCut" | "daihinmin" | "daifugo" | "gekokujo", cards?: GameCard[], playerName?: string, playerAvatar?: string, durationMs = 3000) => {
     if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
     setAnnouncement({ message, type, cards, playerName, playerAvatar });
-    announceTimerRef.current = setTimeout(() => setAnnouncement(null), 3000);
+    announceTimerRef.current = setTimeout(() => setAnnouncement(null), durationMs);
   }, []);
 
   // Socketイベントリスナー登録
@@ -262,15 +262,15 @@ export default function GamePage() {
       if (data.message.includes("下剋上")) {
         const name = data.message.split("が")[0];
         const p = findPlayer(name);
-        playDaifugo();
-        announce("下剋上！！", "gekokujo", undefined, name, p?.avatar);
+        setTimeout(() => playDaifugo(), 1000);
+        announce("下剋上！！", "gekokujo", undefined, name, p?.avatar, 4000);
         return;
       }
       if (data.message.includes("大富豪")) {
         const name = data.message.split("が")[0];
         const p = findPlayer(name);
-        playDaifugo();
-        announce("大富豪", "daifugo", undefined, name, p?.avatar);
+        setTimeout(() => playDaifugo(), 1000);
+        announce("大富豪", "daifugo", undefined, name, p?.avatar, 4000);
         return;
       }
       if (data.message.includes("都落ち")) {
@@ -279,11 +279,11 @@ export default function GamePage() {
         const match = data.message.match(/都落ち！(.+?)の/);
         const name = match?.[1] || "";
         const p = findPlayer(name);
-        // 大富豪/下剋上演出(3秒)の後に都落ちを全員に表示
+        // 大富豪/下剋上演出(4秒)の後に都落ちを全員に表示
         setTimeout(() => {
-          playMiyakoOchi();
-          announce("都落ち！！", "miyakoOchi", undefined, name, p?.avatar);
-        }, 3200);
+          setTimeout(() => playMiyakoOchi(), 1000);
+          announce("都落ち！！", "miyakoOchi", undefined, name, p?.avatar, 4000);
+        }, 4200);
         return;
       }
       if (data.message.includes("大貧民")) {
@@ -291,8 +291,8 @@ export default function GamePage() {
         if (!miyakoOchiThisRoundRef.current) {
           const name = data.message.split("が")[0];
           const p = findPlayer(name);
-          playDaihinmin();
-          announce("大貧民", "daihinmin", undefined, name, p?.avatar);
+          setTimeout(() => playDaihinmin(), 1000);
+          announce("大貧民", "daihinmin", undefined, name, p?.avatar, 4000);
         }
         return;
       }

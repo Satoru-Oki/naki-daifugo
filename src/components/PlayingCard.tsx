@@ -12,7 +12,7 @@ import Image from "next/image";
 
 interface PlayingCardProps {
   card: GameCard;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
   /** JS算出のピクセル幅（指定時は cqi ではなくこの値を使用） */
   widthPx?: number;
   /** JS算出のピクセル高（指定時は cqi ではなくこの値を使用） */
@@ -41,6 +41,7 @@ const BASE = {
   md: { width: 48, height: 67 },
   lg: { width: 60, height: 84 },
   xl: { width: 84, height: 118 },
+  "2xl": { width: 120, height: 168 },
 };
 
 const SIZES = Object.fromEntries(

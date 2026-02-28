@@ -57,16 +57,16 @@ export function BigAnnouncement({ message, type, cards, playerName, playerAvatar
           <div className="text-4xl font-black text-red-300 drop-shadow-lg">
             下剋上！！
           </div>
-          <div className="animate-[daifugoCard_2.5s_ease-in-out_0.3s_both]">
-            <PlayingCard card={JOKER_CARD} size="xl" />
+          <div className="animate-[daifugoCard_3.5s_ease-in-out_0.3s_both]">
+            <PlayingCard card={JOKER_CARD} size="2xl" />
           </div>
         </div>
         <style>{`
           @keyframes daifugoCard {
             0% { opacity: 0; transform: scale(0.3) rotate(-180deg); }
-            30% { opacity: 1; transform: scale(1.1) rotate(0deg); }
-            40% { transform: scale(1) rotate(0deg); }
-            90% { opacity: 1; transform: scale(1) rotate(360deg); }
+            25% { opacity: 1; transform: scale(1.1) rotate(0deg); }
+            35% { transform: scale(1) rotate(0deg); }
+            85% { opacity: 1; transform: scale(1) rotate(360deg); }
             100% { opacity: 0; transform: scale(0.8) rotate(360deg); }
           }
         `}</style>
@@ -83,16 +83,16 @@ export function BigAnnouncement({ message, type, cards, playerName, playerAvatar
           <div className="text-4xl font-black text-yellow-300 drop-shadow-lg">
             大富豪
           </div>
-          <div className="animate-[daifugoCard_2.5s_ease-in-out_0.3s_both]">
-            <PlayingCard card={JOKER_CARD} size="xl" />
+          <div className="animate-[daifugoCard_3.5s_ease-in-out_0.3s_both]">
+            <PlayingCard card={JOKER_CARD} size="2xl" />
           </div>
         </div>
         <style>{`
           @keyframes daifugoCard {
             0% { opacity: 0; transform: scale(0.3) rotate(-180deg); }
-            30% { opacity: 1; transform: scale(1.1) rotate(0deg); }
-            40% { transform: scale(1) rotate(0deg); }
-            90% { opacity: 1; transform: scale(1) rotate(360deg); }
+            25% { opacity: 1; transform: scale(1.1) rotate(0deg); }
+            35% { transform: scale(1) rotate(0deg); }
+            85% { opacity: 1; transform: scale(1) rotate(360deg); }
             100% { opacity: 0; transform: scale(0.8) rotate(360deg); }
           }
         `}</style>
@@ -109,7 +109,7 @@ export function BigAnnouncement({ message, type, cards, playerName, playerAvatar
           <div className="text-4xl font-black text-gray-200 drop-shadow-lg">
             大貧民
           </div>
-          <div className="animate-[daihinminImg_2.5s_ease-in-out_0.3s_both]">
+          <div className="animate-[daihinminImg_3.5s_ease-in-out_0.3s_both]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/effect/大貧民.jpg"
@@ -140,7 +140,7 @@ export function BigAnnouncement({ message, type, cards, playerName, playerAvatar
           <div className="text-4xl font-black text-purple-200 drop-shadow-lg">
             都落ち
           </div>
-          <div className="animate-[daihinminImg_2.5s_ease-in-out_0.3s_both]">
+          <div className="animate-[daihinminImg_3.5s_ease-in-out_0.3s_both]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/effect/大貧民.jpg"
