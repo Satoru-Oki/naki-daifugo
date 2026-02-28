@@ -46,6 +46,8 @@ export class GameEngine {
   phase: GamePhase = "waiting";
   discardPile: GameCard[] = [];
   nakiCount = 0;
+  pendingEightCut = false;
+  pendingElevenBack = false;
   finishCounter = 0;
   exchangeState: Map<string, ExchangeEntry> = new Map();
   prevDaifugoId: string | null = null;
@@ -108,15 +110,18 @@ export class GameEngine {
         this.finishCounter++;
         activePlayers[0].finished = true;
         activePlayers[0].finishOrder = this.finishCounter;
+        this.assignRankImmediate(activePlayers[0]);
       }
       this.phase = "round_end";
       this.assignRanks();
       return;
     }
 
-    // naki_chance中ならplayingに戻す
+    // naki_chance中ならplayingに戻す（ペンディング中の8切り・イレブンバックもクリア）
     if (this.phase === "naki_chance") {
       this.phase = "playing";
+      this.pendingEightCut = false;
+      this.pendingElevenBack = false;
       if (!isCurrent) {
         // カードを出したプレイヤーは残っているので通常のターン進行
         this.advanceTurn();
@@ -157,8 +162,9 @@ export class GameEngine {
     const deck = shuffle(createDeck());
     const numPlayers = this.players.length;
 
-    // 均等配布
-    this.players.forEach((p, i) => {
+    // prevRank を退避（即時スコア計算用）+ 状態リセット
+    this.players.forEach((p) => {
+      p.prevRank = p.rank;
       p.hand = [];
       p.passed = false;
       p.finished = false;
@@ -192,6 +198,8 @@ export class GameEngine {
     this.field = [];
     this.discardPile = [];
     this.nakiCount = 0;
+    this.pendingEightCut = false;
+    this.pendingElevenBack = false;
     this.finishCounter = 0;
     this.phase = "playing";
   }
@@ -201,6 +209,8 @@ export class GameEngine {
     this.field = [];
     this.discardPile = [];
     this.nakiCount = 0;
+    this.pendingEightCut = false;
+    this.pendingElevenBack = false;
     this.finishCounter = 0;
     this.currentTurnIndex = 0;
     this.isRevolution = false;
@@ -236,6 +246,8 @@ export class GameEngine {
     eightCutCards?: GameCard[];
     elevenBack?: boolean;
     playerFinished?: boolean;
+    miyakoOchi?: { playerId: string; playerName: string };
+    spade3Cut?: boolean;
   } {
     if (this.phase !== "playing") return { success: false, error: "現在カードを出せません" };
     const player = this.players.find((p) => p.id === playerId);
@@ -269,12 +281,47 @@ export class GameEngine {
 
     // バリデーション: 場にカードがある場合、同枚数で強いカードのみ
     if (this.field.length > 0) {
-      // ジョーカー単体は♠3でのみ切れる（特殊ケース: 強さチェック不要）
+      // ジョーカー単体は♠3でのみ切れる → 場を流して♠3プレイヤーのターンに
       if (this.field.length === 1 && isJoker(this.field[0])) {
         if (!canBeatJoker(cards)) {
           return { success: false, error: "ジョーカーには♠3でのみ切れます" };
         }
-        // ♠3で切る場合は以降のチェックをスキップ
+        // 手札から♠3を除去
+        player.hand = player.hand.filter((c) => !cardIds.includes(c.id));
+        // ジョーカーと♠3をまとめて捨て札へ、場をクリア
+        this.discardPile.push(...this.field, ...cards);
+        this.field = [];
+        this.fieldType = "single";
+        this.isElevenBack = false;
+        this.players.forEach((p) => {
+          if (!p.finished) p.passed = false;
+        });
+        // 上がりチェック
+        let playerFinished = false;
+        let miyakoOchi: { playerId: string; playerName: string } | undefined;
+        if (player.hand.length === 0) {
+          this.finishCounter++;
+          player.finished = true;
+          player.finishOrder = this.finishCounter;
+          this.assignRankImmediate(player);
+          playerFinished = true;
+          miyakoOchi = this.checkMiyakoOchi(playerId);
+        }
+        // ♠3カットは8切りと同様にそのプレイヤーのターン継続
+        // ただしラウンド終了チェックは必要
+        this.currentTurnIndex = this.players.indexOf(player);
+        const activePlayers = this.players.filter((p) => !p.finished);
+        if (activePlayers.length <= 1) {
+          if (activePlayers.length === 1) {
+            this.finishCounter++;
+            activePlayers[0].finished = true;
+            activePlayers[0].finishOrder = this.finishCounter;
+            this.assignRankImmediate(activePlayers[0]);
+          }
+          this.phase = "round_end";
+          this.assignRanks();
+        }
+        return { success: true, spade3Cut: true, playerFinished, miyakoOchi };
       } else {
         if (cards.length !== this.field.length) {
           return { success: false, error: "同じ枚数で出してください" };
@@ -353,10 +400,6 @@ export class GameEngine {
     let elevenBack = false;
     const normalCards = cards.filter((c) => !isJoker(c)) as Card[];
     const hasJack = normalCards.some((c) => c.rank === "J");
-    if (hasJack) {
-      this.isElevenBack = !this.isElevenBack;
-      elevenBack = true;
-    }
 
     // 8切りチェック: 8を含むカードで場が流れる
     let eightCut = false;
@@ -367,11 +410,40 @@ export class GameEngine {
 
     // 上がりチェック
     let playerFinished = false;
+    let miyakoOchi: { playerId: string; playerName: string } | undefined;
     if (player.hand.length === 0) {
       this.finishCounter++;
       player.finished = true;
       player.finishOrder = this.finishCounter;
+      this.assignRankImmediate(player);
       playerFinished = true;
+      miyakoOchi = this.checkMiyakoOchi(playerId);
+    }
+
+    // 鳴きチャンスチェック（8切り・イレブンバックより優先）
+    let nakiChance = false;
+    if (cards.length === 1 && !isJoker(cards[0])) {
+      const card = cards[0] as Card;
+      if (NAKI_RANKS.includes(card.rank)) {
+        // 他のプレイヤーで鳴ける人がいるかチェック
+        const canAnyone = this.players.some((p) =>
+          p.id !== playerId && !p.finished && canNaki(cards[0], p.hand).possible
+        );
+        if (canAnyone) {
+          nakiChance = true;
+          this.phase = "naki_chance";
+          // 8切り・イレブンバックは鳴きウィンドウ解決時に判定
+          this.pendingEightCut = eightCut;
+          this.pendingElevenBack = hasJack;
+          return { success: true, nakiChance, eightCut: false, elevenBack: false, revolution, playerFinished, miyakoOchi };
+        }
+      }
+    }
+
+    // 鳴きウィンドウに入らなかった場合はイレブンバックを即時適用
+    if (hasJack) {
+      this.isElevenBack = !this.isElevenBack;
+      elevenBack = true;
     }
 
     // 8切り: 場を流し、出したプレイヤーのターンに
@@ -387,30 +459,14 @@ export class GameEngine {
       if (playerFinished) {
         this.advanceTurn();
       }
-      return { success: true, eightCut, eightCutCards: cards, elevenBack, revolution, playerFinished };
-    }
-
-    // 鳴きチャンスチェック
-    let nakiChance = false;
-    if (cards.length === 1 && !isJoker(cards[0])) {
-      const card = cards[0] as Card;
-      if (NAKI_RANKS.includes(card.rank)) {
-        // 他のプレイヤーで鳴ける人がいるかチェック
-        const canAnyone = this.players.some((p) =>
-          p.id !== playerId && !p.finished && canNaki(cards[0], p.hand).possible
-        );
-        if (canAnyone) {
-          nakiChance = true;
-          this.phase = "naki_chance";
-        }
-      }
+      return { success: true, eightCut, eightCutCards: cards, elevenBack, revolution, playerFinished, miyakoOchi };
     }
 
     if (!nakiChance) {
       this.advanceTurn();
     }
 
-    return { success: true, nakiChance, eightCut, elevenBack, revolution, playerFinished };
+    return { success: true, nakiChance, eightCut, elevenBack, revolution, playerFinished, miyakoOchi };
   }
 
   /** 鳴き実行 */
@@ -419,6 +475,7 @@ export class GameEngine {
     error?: string;
     cards?: GameCard[];
     playerFinished?: boolean;
+    miyakoOchi?: { playerId: string; playerName: string };
   } {
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { success: false, error: "プレイヤーが見つかりません" };
@@ -435,6 +492,10 @@ export class GameEngine {
     );
 
     const nakiCards = [result.prev, this.field[0], result.next];
+
+    // 鳴き成立 → 8切り・イレブンバックのペンディングをキャンセル
+    this.pendingEightCut = false;
+    this.pendingElevenBack = false;
 
     // 全て捨て札へ、場をクリア
     this.discardPile.push(...nakiCards);
@@ -454,14 +515,17 @@ export class GameEngine {
 
     // 上がりチェック（鳴き上がり）
     let playerFinished = false;
+    let miyakoOchi: { playerId: string; playerName: string } | undefined;
     if (player.hand.length === 0) {
       this.finishCounter++;
       player.finished = true;
       player.finishOrder = this.finishCounter;
+      this.assignRankImmediate(player);
       playerFinished = true;
+      miyakoOchi = this.checkMiyakoOchi(playerId);
     }
 
-    return { success: true, cards: nakiCards, playerFinished };
+    return { success: true, cards: nakiCards, playerFinished, miyakoOchi };
   }
 
   /** パス */
@@ -496,10 +560,68 @@ export class GameEngine {
   }
 
   /** 鳴きウィンドウ解決（スキップ or タイムアウト）→ 次ターンへ */
-  resolveNakiWindow(): void {
-    if (this.phase !== "naki_chance") return;
+  resolveNakiWindow(): { eightCut: boolean; eightCutCards?: GameCard[]; elevenBack: boolean } {
+    if (this.phase !== "naki_chance") return { eightCut: false, elevenBack: false };
     this.phase = "playing";
+
+    // 鳴かれなかったイレブンバックを確定
+    let elevenBack = false;
+    if (this.pendingElevenBack) {
+      this.pendingElevenBack = false;
+      this.isElevenBack = !this.isElevenBack;
+      elevenBack = true;
+    }
+
+    // 鳴かれなかった8 → 8切り発動
+    if (this.pendingEightCut) {
+      this.pendingEightCut = false;
+      const eightCutCards = [...this.field];
+      this.discardPile.push(...this.field);
+      this.field = [];
+      this.fieldType = "single";
+      this.isElevenBack = false;
+      this.players.forEach((p) => {
+        if (!p.finished) p.passed = false;
+      });
+      // 出したプレイヤーが上がっていれば次へ
+      const currentPlayer = this.players[this.currentTurnIndex];
+      if (currentPlayer.finished) {
+        this.advanceTurn();
+      }
+      return { eightCut: true, eightCutCards, elevenBack };
+    }
+
     this.advanceTurn();
+    return { eightCut: false, elevenBack };
+  }
+
+  /** 都落ちチェック: 前ラウンド大富豪以外が最初に上がったら即時発動 */
+  private checkMiyakoOchi(finishedPlayerId: string): { playerId: string; playerName: string } | undefined {
+    // 最初の上がり（finishOrder === 1）でなければ対象外
+    if (this.finishCounter !== 1) return undefined;
+    // 前ラウンド大富豪がいなければ対象外
+    if (!this.prevDaifugoId) return undefined;
+    // 上がった人が前大富豪本人なら都落ちなし
+    if (finishedPlayerId === this.prevDaifugoId) return undefined;
+
+    const prevDaifugo = this.players.find((p) => p.id === this.prevDaifugoId);
+    if (!prevDaifugo || prevDaifugo.finished) return undefined;
+
+    // 前大富豪の手札を破棄して最下位確定・大貧民に降格
+    // finishCounter はインクリメントしない（被害者は finishOrder/rank を直接設定）
+    // これにより残りプレイヤーが 2,3,...,players.length-1 の順位を使い衝突しない
+    this.discardPile.push(...prevDaifugo.hand);
+    prevDaifugo.hand = [];
+    prevDaifugo.finished = true;
+    prevDaifugo.finishOrder = this.players.length; // 最下位
+    prevDaifugo.rank = "大貧民";
+
+    this.miyakoOchiResult = {
+      playerId: prevDaifugo.id,
+      playerName: prevDaifugo.name,
+    };
+
+    return this.miyakoOchiResult;
   }
 
   /** 次のターンへ */
@@ -520,73 +642,45 @@ export class GameEngine {
         this.finishCounter++;
         activePlayers[0].finished = true;
         activePlayers[0].finishOrder = this.finishCounter;
+        this.assignRankImmediate(activePlayers[0]);
       }
       this.phase = "round_end";
       this.assignRanks();
     }
   }
 
-  /** 階級を割り当て */
-  private assignRanks(): void {
-    // prevRank を退避（ボーナス判定用）
-    this.players.forEach((p) => { p.prevRank = p.rank; });
-
-    const sorted = [...this.players].sort((a, b) => a.finishOrder - b.finishOrder);
-    const rankNames: PlayerRank[] = ["大富豪", "富豪", "平民", "貧民", "大貧民"];
-    const n = sorted.length;
-
-    // 通常のランク割り当て
-    sorted.forEach((p, i) => {
-      if (n === 3) {
-        p.rank = (["大富豪", "平民", "大貧民"] as PlayerRank[])[i];
-      } else if (n === 4) {
-        p.rank = (["大富豪", "富豪", "貧民", "大貧民"] as PlayerRank[])[i];
-      } else {
-        p.rank = rankNames[i] || "平民";
-      }
-    });
-
-    // 都落ち判定: 前ラウンドの大富豪が今回1位でなければ大貧民に降格
-    this.miyakoOchiResult = null;
-    if (this.prevDaifugoId) {
-      const prevDaifugo = this.players.find((p) => p.id === this.prevDaifugoId);
-      if (prevDaifugo && prevDaifugo.rank !== "大富豪") {
-        // 現在の大貧民を見つけて繰り上げ
-        const currentDaihinmin = this.players.find(
-          (p) => p.rank === "大貧民" && p.id !== prevDaifugo.id
-        );
-        if (currentDaihinmin) {
-          // 元の大貧民に、都落ちプレイヤーの元のランクを付与
-          currentDaihinmin.rank = prevDaifugo.rank;
-        }
-        // 前大富豪を大貧民に降格
-        prevDaifugo.rank = "大貧民";
-        this.miyakoOchiResult = {
-          playerId: prevDaifugo.id,
-          playerName: prevDaifugo.name,
-        };
-      }
+  /** finishOrder に対応するランクとスコアを即時割り当て */
+  private assignRankImmediate(player: PlayerState): void {
+    const n = this.players.length;
+    const rankTable3: PlayerRank[] = ["大富豪", "平民", "大貧民"];
+    const rankTable4: PlayerRank[] = ["大富豪", "富豪", "貧民", "大貧民"];
+    const rankTable5: PlayerRank[] = ["大富豪", "富豪", "平民", "貧民", "大貧民"];
+    const table = n === 3 ? rankTable3 : n === 4 ? rankTable4 : rankTable5;
+    const idx = player.finishOrder - 1; // finishOrder は 1 始まり
+    if (idx >= 0 && idx < table.length) {
+      player.rank = table[idx];
     }
 
-    // スコア加算（人数別テーブル + ボーナス）
+    // スコア即時加算
     const scoreTable = RANK_SCORE[n] || RANK_SCORE[5];
-    this.players.forEach((p) => {
-      let pts = scoreTable[p.rank];
+    let pts = scoreTable[player.rank] || 0;
 
-      // 下剋上ボーナス: 前ラウンド大貧民 → 今ラウンド大富豪/富豪
-      if (p.prevRank === "大貧民") {
-        if (p.rank === "大富豪") pts += 10;
-        else if (p.rank === "富豪") pts += 7;
-      }
+    // 下剋上ボーナス: 前ラウンド大貧民 → 今ラウンド大富豪/富豪
+    if (player.prevRank === "大貧民") {
+      if (player.rank === "大富豪") pts += 10;
+      else if (player.rank === "富豪") pts += 7;
+    }
 
-      // ノー強カードボーナス: Joker/2なし手札で大富豪 or 富豪
-      if (!p.hadStrongCards && (p.rank === "大富豪" || p.rank === "富豪")) {
-        pts += 3;
-      }
+    // ノー強カードボーナス: Joker/2なし手札で大富豪 or 富豪
+    if (!player.hadStrongCards && (player.rank === "大富豪" || player.rank === "富豪")) {
+      pts += 3;
+    }
 
-      p.totalScore += pts;
-    });
+    player.totalScore += pts;
+  }
 
+  /** 階級を最終確定（スコアは assignRankImmediate で即時加算済み） */
+  private assignRanks(): void {
     // 今回の大富豪を記録
     const newDaifugo = this.players.find((p) => p.rank === "大富豪");
     this.prevDaifugoId = newDaifugo?.id || null;
@@ -603,6 +697,8 @@ export class GameEngine {
     this.field = [];
     this.discardPile = [];
     this.nakiCount = 0;
+    this.pendingEightCut = false;
+    this.pendingElevenBack = false;
     this.finishCounter = 0;
     this.isRevolution = false;
     this.isElevenBack = false;
@@ -610,7 +706,9 @@ export class GameEngine {
     const deck = shuffle(createDeck());
     const numPlayers = this.players.length;
 
+    // prevRank を退避（即時スコア計算用）+ 状態リセット
     this.players.forEach((p) => {
+      p.prevRank = p.rank;
       p.hand = [];
       p.passed = false;
       p.finished = false;

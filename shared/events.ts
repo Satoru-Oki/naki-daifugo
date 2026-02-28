@@ -25,7 +25,7 @@ export interface ServerToClientEvents {
   game_state: (state: ClientGameState) => void;
   intercept_window: (data: { card: GameCard }) => void;
   intercept_result: (data: { playerId: string; playerName: string; cards: GameCard[] }) => void;
-  round_end: (data: { rankings: { playerId: string; rank: PlayerRank }[]; miyakoOchi?: { playerId: string; playerName: string } }) => void;
+  round_end: (data: { rankings: { playerId: string; rank: PlayerRank; prevRank: PlayerRank }[] }) => void;
   chat_message: (data: ChatMessage) => void;
   session: (data: { sessionId: string; playerId: string }) => void;
   reconnected: (data: { roomId: string; playerName: string }) => void;
@@ -56,6 +56,7 @@ export interface ClientGameState {
     rank: PlayerRank;
     passed: boolean;
     isCurrentTurn: boolean;
+    finished: boolean;
     totalScore: number;
     avatar?: string;
   }[];

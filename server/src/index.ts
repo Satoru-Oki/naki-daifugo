@@ -41,14 +41,14 @@ async function main() {
     cors: {
       origin: process.env.NODE_ENV === "production"
         ? true
-        : process.env.CLIENT_URL || [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://192.168.40.136:3000",
-            "http://192.168.40.136:3001",
-            "https://localhost:3443",
-            "https://192.168.40.136:3443",
-          ],
+        : (origin, callback) => {
+            // 開発環境: localhost と プライベートIPを許可
+            if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+              callback(null, true);
+            } else {
+              callback(new Error("CORS not allowed"));
+            }
+          },
       methods: ["GET", "POST"],
     },
     pingInterval: 10_000,

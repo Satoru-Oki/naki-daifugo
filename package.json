@@ -4,7 +4,7 @@
   "private": true,
   "engines": { "node": "20.x" },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
     "dev:server": "ts-node-dev --respawn --transpile-only --ignore-watch .next --ignore-watch node_modules -P server/tsconfig.json server/src/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "dev:proxy": "node scripts/https-proxy.js",

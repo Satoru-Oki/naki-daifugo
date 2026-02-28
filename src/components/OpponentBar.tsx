@@ -172,8 +172,8 @@ function TopAvatar({ player }: { player: Player }) {
   return (
     <div className={`flex flex-col items-center ${dimmed}`}>
       <PlayerLabel player={player} inline />
-      {/* カード領域 + アイコン重ね */}
-      <div className="relative mt-0.5">
+      {/* カード領域 + アイコン重ね（上がり時も高さを維持して場のカードがずれないようにする） */}
+      <div className="relative mt-0.5" style={{ minHeight: TOP_CARD_H + 8 + 20 }}>
         {/* カード（背面） */}
         {player.cardCount > 0 && (
           <div className="pt-5">

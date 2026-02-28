@@ -3,10 +3,13 @@ import type { ClientToServerEvents, ServerToClientEvents } from "../../shared/ev
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-// HTTPS プロキシ経由の場合は同一オリジン、それ以外は env の値を使用
+// 接続先URLを決定: ブラウザのホスト名を使い、バックエンドのポートに接続
 function getServerUrl(): string {
   if (process.env.NEXT_PUBLIC_SERVER_URL) return process.env.NEXT_PUBLIC_SERVER_URL;
   if (typeof window !== "undefined" && window.location.protocol === "https:") return "";
+  if (typeof window !== "undefined") {
+    return `http://${window.location.hostname}:3001`;
+  }
   return "http://localhost:3001";
 }
 const SERVER_URL = getServerUrl();
@@ -122,7 +125,7 @@ export function startKeepAlive(s: GameSocket): void {
 
   // HTTP keepalive: Renderのスピンダウン防止（2分間隔でヘルスチェック）
   httpKeepAliveTimer = setInterval(() => {
-    fetch("/api/health").catch(() => {});
+    fetch(`${SERVER_URL}/api/health`).catch(() => {});
   }, 2 * 60_000);
 
   // visibilitychange: タブ復帰時に接続チェック

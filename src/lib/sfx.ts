@@ -184,53 +184,10 @@ export function playRevolution(): void {
   });
 }
 
-/** 都落ち音 — じゃらーん！下降感のある没落サウンド */
+/** 都落ち音 — sorehasoredeii.m4a を再生 */
 export function playMiyakoOchi(): void {
-  const ac = getContext();
-  const t = ac.currentTime;
-
-  // 第1打: 高めの不協和音（ジャッ）
-  [330, 392, 466].forEach((freq) => {
-    const osc = ac.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.value = freq;
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.2, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-    osc.connect(g).connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.2);
-  });
-
-  // 第2打: 下降（ジャッ）
-  [260, 311, 370].forEach((freq) => {
-    const osc = ac.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.value = freq;
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.25, t + 0.25);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    osc.connect(g).connect(ac.destination);
-    osc.start(t + 0.25);
-    osc.stop(t + 0.5);
-  });
-
-  // 第3打: じゃらーん（マイナーコード、長く下降して没落感）
-  [196, 233, 277, 330].forEach((freq) => {
-    const osc = ac.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(freq, t + 0.55);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 1.6);
-    const lp = ac.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 1500;
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.25, t + 0.55);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
-    osc.connect(lp).connect(g).connect(ac.destination);
-    osc.start(t + 0.55);
-    osc.stop(t + 1.6);
-  });
+  const audio = new Audio("/audio/sorehasoredeii.m4a");
+  audio.play().catch(() => {});
 }
 
 /** チャット通知音 — 低めの柔らかいトーン（ポコン） */
@@ -259,6 +216,18 @@ export function playVoiceStamp(stampId: string): void {
   audio.play().catch(() => {
     // ユーザー操作前の自動再生制限等でエラーになる場合は無視
   });
+}
+
+/** 大富豪音 — daredemokakattekoi.m4a を再生 */
+export function playDaifugo(): void {
+  const audio = new Audio("/audio/daredemokakattekoi.m4a");
+  audio.play().catch(() => {});
+}
+
+/** 大貧民音 — douttekotoneyo.m4a を再生 */
+export function playDaihinmin(): void {
+  const audio = new Audio("/audio/douttekotoneyo.m4a");
+  audio.play().catch(() => {});
 }
 
 /** カード出し音 — 短いノイズバースト（シュッ） */

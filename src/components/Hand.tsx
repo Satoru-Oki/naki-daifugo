@@ -39,7 +39,9 @@ export default function Hand({ cards, selectedIds, onTapCard, enabled, dealing =
   const cardHeight = Math.round(cardWidth * 1.4);
 
   // 水平オフセット: オーバーラップ幅は最大30pxに制限し、中央にコンパクト表示
-  const available = containerWidth - 16; // px-2 分
+  // 左端のカードが回転で見切れないよう右寄せ補正
+  const leftPad = 12;
+  const available = containerWidth - 8 - leftPad; // px-1(8px) + 左余白
   const maxOverlap = 30;
   const visibleWidth =
     N <= 1 ? 0 : Math.min(maxOverlap, Math.max(14, Math.floor((available - cardWidth) / (N - 1))));
@@ -73,8 +75,8 @@ export default function Hand({ cards, selectedIds, onTapCard, enabled, dealing =
         {cards.map((card, i) => {
           const isSelected = selectedIds.has(card.id);
 
-          // 水平位置: 中央寄せ
-          const offsetX = (available - totalFanWidth) / 2;
+          // 水平位置: 左余白分だけ右にオフセット
+          const offsetX = leftPad + (available - totalFanWidth) / 2;
           const left = offsetX + i * visibleWidth;
 
           // 回転: -spread/2 〜 +spread/2 に均等分布
@@ -126,7 +128,7 @@ export default function Hand({ cards, selectedIds, onTapCard, enabled, dealing =
         })}
         {/* 透明クリックターゲット: 各カードの見える帯幅で配置し、視覚z-indexに影響されずタップ可能にする */}
         {enabled && cards.map((card, i) => {
-          const offsetX = (available - totalFanWidth) / 2;
+          const offsetX = leftPad + (available - totalFanWidth) / 2;
           const left = offsetX + i * visibleWidth;
           const hitWidth = i === N - 1 ? cardWidth : visibleWidth;
 

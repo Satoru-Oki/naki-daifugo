@@ -27,7 +27,6 @@ export class GameRoom {
   engine: GameEngine;
   maxPlayers: number;
   nextRoundTimer: ReturnType<typeof setTimeout> | null = null;
-  nakiTimer: ReturnType<typeof setTimeout> | null = null;
   pendingJoin: PendingJoin | null = null;
   voiceUsers: Set<string> = new Set();
   private io: Server;
@@ -157,6 +156,11 @@ export class GameRoom {
 
     this.engineRemovalTimers.set(playerId, timer);
 
+    // 鳴きチャンス中の切断 → 鳴きウィンドウを強制解決
+    if (this.engine.phase === "naki_chance") {
+      this.resolveNakiIfNeeded();
+    }
+
     // 切断プレイヤーのターンなら自動パスをスケジュール
     this.scheduleAutoPass();
   }
@@ -205,6 +209,8 @@ export class GameRoom {
     }
     if (this.engine.phase === "round_end" && phaseBefore !== "round_end") {
       this.endRound();
+    } else {
+      this.scheduleAutoPass();
     }
   }
 
@@ -237,6 +243,8 @@ export class GameRoom {
         }
         if (this.engine.phase === "round_end" && phaseBefore !== "round_end") {
           this.endRound();
+        } else {
+          this.scheduleAutoPass();
         }
       }
 
@@ -373,19 +381,36 @@ export class GameRoom {
         this.broadcast("notification", { message: "✂️ 8切り！", cards: result.eightCutCards });
       }
 
+      if (result.spade3Cut) {
+        this.broadcast("notification", { message: "♠3でジョーカー返し！" });
+      }
+
       if (result.playerFinished) {
         const player = this.players.find((p) => p.id === playerId);
-        this.broadcast("notification", { message: `🎉 ${player?.name}が上がり！` });
+        const enginePlayer = this.engine.players.find((p) => p.id === playerId);
+        if (enginePlayer?.finishOrder === 1) {
+          if (enginePlayer.prevRank === "大貧民") {
+            this.broadcast("notification", { message: `${player?.name}が下剋上！` });
+          } else {
+            this.broadcast("notification", { message: `${player?.name}が大富豪！` });
+          }
+        } else {
+          this.broadcast("notification", { message: `🎉 ${player?.name}が上がり！` });
+        }
+      }
+
+      if (result.miyakoOchi) {
+        this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
       }
 
       this.broadcastGameState();
 
       if (result.nakiChance) {
         this.startNakiWindow();
-      }
-
-      if (this.engine.phase === "round_end") {
+      } else if (this.engine.phase === "round_end") {
         this.endRound();
+      } else {
+        this.scheduleAutoPass();
       }
     });
 
@@ -404,11 +429,12 @@ export class GameRoom {
 
       if (this.engine.phase === "round_end") {
         this.endRound();
+      } else {
+        this.scheduleAutoPass();
       }
     });
 
     socket.on("intercept", () => {
-      this.clearNakiTimer();
       const result = this.engine.doIntercept(playerId);
       if (!result.success) {
         socket.emit("game_error", { message: result.error! });
@@ -423,7 +449,20 @@ export class GameRoom {
       });
 
       if (result.playerFinished) {
-        this.broadcast("notification", { message: `🎉 ${player?.name}が鳴き上がり！` });
+        const enginePlayer = this.engine.players.find((p) => p.id === playerId);
+        if (enginePlayer?.finishOrder === 1) {
+          if (enginePlayer.prevRank === "大貧民") {
+            this.broadcast("notification", { message: `${player?.name}が下剋上！` });
+          } else {
+            this.broadcast("notification", { message: `${player?.name}が大富豪！` });
+          }
+        } else {
+          this.broadcast("notification", { message: `🎉 ${player?.name}が鳴き上がり！` });
+        }
+      }
+
+      if (result.miyakoOchi) {
+        this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
       }
 
       this.broadcastGameState();
@@ -434,12 +473,16 @@ export class GameRoom {
     });
 
     socket.on("skip_intercept", () => {
-      this.clearNakiTimer();
       if (this.engine.phase !== "naki_chance") return;
-      this.engine.resolveNakiWindow();
+      const nakiResult = this.engine.resolveNakiWindow();
+      if (nakiResult.eightCut) {
+        this.broadcast("notification", { message: "✂️ 8切り！", cards: nakiResult.eightCutCards });
+      }
       this.broadcastGameState();
       if ((this.engine.phase as string) === "round_end") {
         this.endRound();
+      } else {
+        this.scheduleAutoPass();
       }
     });
 
@@ -581,28 +624,24 @@ export class GameRoom {
     }
   }
 
-  /** 鳴きウィンドウ開始（10秒タイムアウト付き） */
+  /** 鳴きウィンドウ開始 */
   private startNakiWindow(): void {
-    this.clearNakiTimer();
     const card = this.engine.field[0];
     this.io.to(this.id).emit("intercept_window", { card });
-
-    this.nakiTimer = setTimeout(() => {
-      this.nakiTimer = null;
-      if (this.engine.phase !== "naki_chance") return;
-      this.engine.resolveNakiWindow();
-      this.broadcastGameState();
-      if ((this.engine.phase as string) === "round_end") {
-        this.endRound();
-      }
-    }, 10_000);
   }
 
-  /** 鳴きタイマーをクリア */
-  private clearNakiTimer(): void {
-    if (this.nakiTimer) {
-      clearTimeout(this.nakiTimer);
-      this.nakiTimer = null;
+  /** 鳴きウィンドウを強制解決（切断時用） */
+  private resolveNakiIfNeeded(): void {
+    if (this.engine.phase !== "naki_chance") return;
+    const nakiResult = this.engine.resolveNakiWindow();
+    if (nakiResult.eightCut) {
+      this.broadcast("notification", { message: "✂️ 8切り！", cards: nakiResult.eightCutCards });
+    }
+    this.broadcastGameState();
+    if ((this.engine.phase as string) === "round_end") {
+      this.endRound();
+    } else {
+      this.scheduleAutoPass();
     }
   }
 
@@ -612,13 +651,21 @@ export class GameRoom {
     const rankings = this.engine.players.map((p) => ({
       playerId: p.id,
       rank: p.rank,
+      prevRank: p.prevRank,
     }));
-    const miyakoOchi = this.engine.miyakoOchiResult || undefined;
-    this.broadcast("round_end", { rankings, miyakoOchi });
 
-    if (miyakoOchi) {
-      this.broadcast("notification", { message: `都落ち！${miyakoOchi.playerName}が大貧民に！` });
+    // 大貧民の通知を全員に送信（都落ちが発生した場合は都落ち演出で代替するため送らない）
+    if (!this.engine.miyakoOchiResult) {
+      const daihinminPlayer = this.engine.players.find((p) => p.rank === "大貧民");
+      if (daihinminPlayer) {
+        const roomPlayer = this.players.find((rp) => rp.id === daihinminPlayer.id);
+        if (roomPlayer) {
+          this.broadcast("notification", { message: `${roomPlayer.name}が大貧民！` });
+        }
+      }
     }
+
+    this.broadcast("round_end", { rankings });
 
     // 3秒後に次のラウンド開始
     this.nextRoundTimer = setTimeout(() => {

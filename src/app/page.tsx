@@ -5,7 +5,7 @@ import type { GameCard, ChatMessage, Player } from "@/lib/types";
 import { NAKI_RANKS, VOICE_STAMPS } from "@/lib/constants";
 import { canNaki, isJoker, sortHand } from "@/lib/gameLogic";
 import { connectSocket, disconnectAndClearSession, getStoredSessionId, storeSessionId, clearSessionId, storeLastRoom, clearLastRoom, getLastRoom, startKeepAlive, stopKeepAlive, type GameSocket } from "@/lib/socket";
-import { playDeal, playCard as playCardSfx, playPass as playPassSfx, playTurnNotify, playNaki, playRevolution, playMiyakoOchi, playChat, playVoiceStamp } from "@/lib/sfx";
+import { playDeal, playCard as playCardSfx, playPass as playPassSfx, playTurnNotify, playNaki, playRevolution, playMiyakoOchi, playDaifugo, playDaihinmin, playChat, playVoiceStamp } from "@/lib/sfx";
 import { VoiceChat, type VoiceUser } from "@/lib/webrtc";
 import type { ClientGameState, RoomInfo } from "../../shared/events";
 
@@ -65,21 +65,27 @@ export default function GamePage() {
   const [inVoice, setInVoice] = useState(false);
   const [micEnabled, setMicEnabled] = useState(true);
   const [speakerEnabled, setSpeakerEnabled] = useState(true);
-  const [announcement, setAnnouncement] = useState<{ message: string; type: "naki" | "revolution" | "miyakoOchi" | "eightCut"; cards?: GameCard[] } | null>(null);
+  const [announcement, setAnnouncement] = useState<{ message: string; type: "naki" | "revolution" | "miyakoOchi" | "eightCut" | "daihinmin" | "daifugo" | "gekokujo"; cards?: GameCard[]; playerName?: string; playerAvatar?: string } | null>(null);
   const [connected, setConnected] = useState(true);
   const prevPhaseRef = useRef<string>("");
   const prevTurnRef = useRef<string>("");
   const prevRevolutionRef = useRef(false);
+  const miyakoOchiThisRoundRef = useRef(false);
+  const playersRef = useRef<{ id: string; name: string; avatar?: string }[]>([]);
   const handRef = useRef<GameCard[]>([]);
+  const notifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const notify = useCallback((text: string) => {
+    if (notifyTimerRef.current) clearTimeout(notifyTimerRef.current);
     setNote(text);
-    setTimeout(() => setNote(""), 5000);
+    notifyTimerRef.current = setTimeout(() => setNote(""), 5000);
   }, []);
 
-  const announce = useCallback((message: string, type: "naki" | "revolution" | "miyakoOchi" | "eightCut", cards?: GameCard[]) => {
-    setAnnouncement({ message, type, cards });
-    setTimeout(() => setAnnouncement(null), 3000);
+  const announce = useCallback((message: string, type: "naki" | "revolution" | "miyakoOchi" | "eightCut" | "daihinmin" | "daifugo" | "gekokujo", cards?: GameCard[], playerName?: string, playerAvatar?: string) => {
+    if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
+    setAnnouncement({ message, type, cards, playerName, playerAvatar });
+    announceTimerRef.current = setTimeout(() => setAnnouncement(null), 3000);
   }, []);
 
   // Socketイベントリスナー登録
@@ -141,7 +147,17 @@ export default function GamePage() {
         playDeal(state.hand.length);
         setTimeout(() => setDealing(false), state.hand.length * 60 + 200);
       }
+      // 大貧民演出はサーバーからの notification で全員に表示
+
+      // playing に戻ったらフラグリセット
+      if (state.phase === "playing" && prevPhase !== "playing") {
+        miyakoOchiThisRoundRef.current = false;
+      }
+
       prevPhaseRef.current = state.phase;
+
+      // 全プレイヤー情報をrefに保存（通知ハンドラでアバター参照用）
+      playersRef.current = state.players;
 
       setScreen("game");
       setJoinRequestFrom(null);
@@ -210,16 +226,13 @@ export default function GamePage() {
       }
     });
 
-    socket.on("intercept_result", (data: { playerName: string }) => {
+    socket.on("intercept_result", (data: { playerName: string; cards?: GameCard[] }) => {
       playNaki();
-      announce(`${data.playerName}が鳴きました！！`, "naki");
+      announce(`${data.playerName}が鳴きました！！`, "naki", data.cards);
     });
 
-    socket.on("round_end", (data: { rankings: { playerId: string; rank: string }[]; miyakoOchi?: { playerId: string; playerName: string } }) => {
-      if (data.miyakoOchi) {
-        playMiyakoOchi();
-        announce("都落ち！！", "miyakoOchi");
-      }
+    socket.on("round_end", () => {
+      // 大富豪・大貧民・都落ち演出は game_state / notification で発動済み
     });
 
     socket.on("chat_message", (msg: ChatMessage) => {
@@ -239,8 +252,48 @@ export default function GamePage() {
     });
 
     socket.on("notification", (data: { message: string; cards?: GameCard[] }) => {
+      // プレイヤー名からアバターを引くヘルパー
+      const findPlayer = (name: string) => playersRef.current.find((p) => p.name === name);
+
       if (data.message.includes("8切り")) {
         announce("✂️ 8切り！", "eightCut", data.cards);
+        return;
+      }
+      if (data.message.includes("下剋上")) {
+        const name = data.message.split("が")[0];
+        const p = findPlayer(name);
+        playDaifugo();
+        announce("下剋上！！", "gekokujo", undefined, name, p?.avatar);
+        return;
+      }
+      if (data.message.includes("大富豪")) {
+        const name = data.message.split("が")[0];
+        const p = findPlayer(name);
+        playDaifugo();
+        announce("大富豪", "daifugo", undefined, name, p?.avatar);
+        return;
+      }
+      if (data.message.includes("都落ち")) {
+        miyakoOchiThisRoundRef.current = true;
+        // "都落ち！{name}のカードは破棄！" から名前を抽出
+        const match = data.message.match(/都落ち！(.+?)の/);
+        const name = match?.[1] || "";
+        const p = findPlayer(name);
+        // 大富豪/下剋上演出(3秒)の後に都落ちを全員に表示
+        setTimeout(() => {
+          playMiyakoOchi();
+          announce("都落ち！！", "miyakoOchi", undefined, name, p?.avatar);
+        }, 3200);
+        return;
+      }
+      if (data.message.includes("大貧民")) {
+        // 都落ちが発生済みのラウンドでは大貧民演出を出さない
+        if (!miyakoOchiThisRoundRef.current) {
+          const name = data.message.split("が")[0];
+          const p = findPlayer(name);
+          playDaihinmin();
+          announce("大貧民", "daihinmin", undefined, name, p?.avatar);
+        }
         return;
       }
       notify(data.message);
@@ -528,7 +581,7 @@ export default function GamePage() {
             接続が切れています…再接続中
           </div>
         )}
-        {announcement && <BigAnnouncement message={announcement.message} type={announcement.type} cards={announcement.cards} />}
+        {announcement && <BigAnnouncement message={announcement.message} type={announcement.type} cards={announcement.cards} playerName={announcement.playerName} playerAvatar={announcement.playerAvatar} />}
         {joinRequestFrom && (
           <JoinRequestPopup
             playerName={joinRequestFrom}
