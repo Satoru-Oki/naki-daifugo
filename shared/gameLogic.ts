@@ -156,6 +156,19 @@ export function canBeatJoker(cards: GameCard[]): boolean {
     && (cards[0] as Card).suit === "S" && (cards[0] as Card).rank === "3";
 }
 
+/** ポーカー用デッキ生成（52枚、Jokerなし） */
+export function createPokerDeck(): Card[] {
+  const suits: Suit[] = ["S", "H", "D", "C"];
+  const ranks: Rank[] = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"];
+  const deck: Card[] = [];
+  for (const suit of suits) {
+    for (const rank of ranks) {
+      deck.push({ suit, rank, id: `${suit}-${rank}` });
+    }
+  }
+  return deck;
+}
+
 /** デッキ生成（54枚） */
 export function createDeck(): GameCard[] {
   const suits: Suit[] = ["S", "H", "D", "C"];

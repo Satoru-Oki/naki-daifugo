@@ -15,6 +15,9 @@ export interface JokerCard {
 
 export type GameCard = Card | JokerCard;
 
+/** ゲーム種別 */
+export type GameType = "daifugo" | "poker";
+
 export type PlayerRank = "大富豪" | "富豪" | "平民" | "貧民" | "大貧民";
 
 export interface Player {

@@ -3,8 +3,14 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import next from "next";
 import { GameRoom } from "./GameRoom";
+import { PokerRoom } from "./PokerRoom";
 import { SessionManager } from "./SessionManager";
 import type { ClientToServerEvents, ServerToClientEvents } from "../../shared/events";
+
+/** ルームのゲーム種別を判定 */
+function getRoomGameType(room: GameRoom | PokerRoom): "daifugo" | "poker" {
+  return room instanceof PokerRoom ? "poker" : "daifugo";
+}
 
 // プロセスレベルの診断: クラッシュ/SIGTERM を捕捉
 const startedAt = Date.now();
@@ -55,8 +61,9 @@ async function main() {
     pingTimeout: 20_000,
   });
 
-  // ルーム管理
-  const rooms = new Map<string, GameRoom>();
+  // ルーム管理（大富豪 or ポーカー）
+  type AnyRoom = GameRoom | PokerRoom;
+  const rooms = new Map<string, AnyRoom>();
 
   // セッション管理
   const sessionManager = new SessionManager();
@@ -80,6 +87,7 @@ async function main() {
         playerCount: r.playerCount,
         maxPlayers: r.maxPlayers,
         isStarted: r.engine.phase !== "waiting",
+        gameType: r instanceof PokerRoom ? "poker" : "daifugo",
       }));
     res.json(roomList);
   });
@@ -87,7 +95,7 @@ async function main() {
   io.on("connection", (socket) => {
     console.log(`[接続] ${socket.id}`);
 
-    let currentRoom: GameRoom | null = null;
+    let currentRoom: AnyRoom | null = null;
     let currentSessionId: string | null = null;
 
     // 再接続チェック: auth.sessionId があればセッション復帰を試みる
@@ -113,9 +121,9 @@ async function main() {
 
           socket.emit("session", { sessionId: session.sessionId, playerId: session.playerId });
           room.reconnect(socket, session.playerId);
-          socket.emit("reconnected", { roomId: session.roomId, playerName: session.playerName });
+          socket.emit("reconnected", { roomId: session.roomId, playerName: session.playerName, gameType: getRoomGameType(room) });
 
-          console.log(`[再接続] ${session.playerName} → ${session.roomId}`);
+          console.log(`[再接続] ${session.playerName} → ${session.roomId} (${getRoomGameType(room)})`);
           room.notifyAll(`${session.playerName}が再接続しました`);
         } else {
           // ルームが消えている（サーバー再起動等）
@@ -130,7 +138,7 @@ async function main() {
       }
     }
 
-    socket.on("join_room", ({ roomId, playerName, avatar }) => {
+    socket.on("join_room", ({ roomId, playerName, avatar, gameType }) => {
       // 既にルームにいる場合は退出
       if (currentRoom && currentSessionId) {
         const session = sessionManager.getSession(currentSessionId);
@@ -144,12 +152,16 @@ async function main() {
         currentSessionId = null;
       }
 
-      // ルーム取得 or 新規作成
+      // ルーム取得 or 新規作成（gameTypeに応じてルーム種別を選択）
       let room = rooms.get(roomId);
       if (!room) {
-        room = new GameRoom(io, roomId);
+        if (gameType === "poker") {
+          room = new PokerRoom(io, roomId);
+        } else {
+          room = new GameRoom(io, roomId);
+        }
         rooms.set(roomId, room);
-        console.log(`[ルーム作成] ${roomId}`);
+        console.log(`[ルーム作成] ${roomId} (${gameType || "daifugo"})`);
       }
 
       // 名前マッチ再接続: 同名プレイヤーがいれば復帰（全フェーズ対応）
@@ -186,9 +198,9 @@ async function main() {
 
         socket.emit("session", { sessionId: session.sessionId, playerId: session.playerId });
         room.reconnect(socket, existingPlayer.id);
-        socket.emit("reconnected", { roomId, playerName });
+        socket.emit("reconnected", { roomId, playerName, gameType: getRoomGameType(room) });
 
-        console.log(`[名前マッチ再接続] ${playerName} → ${roomId}`);
+        console.log(`[名前マッチ再接続] ${playerName} → ${roomId} (${getRoomGameType(room)})`);
         room.notifyAll(`${playerName}が再接続しました`);
         return;
       }
@@ -202,7 +214,8 @@ async function main() {
       socket.emit("session", { sessionId: session.sessionId, playerId: session.playerId });
 
       // ゲーム中かつ満員でない場合は参加要請
-      if (room.engine.phase !== "waiting" && room.playerCount < room.maxPlayers) {
+      const roomPhase = room.engine.phase as string;
+      if (roomPhase !== "waiting" && roomPhase !== "hand_end" && room.playerCount < room.maxPlayers) {
         room.requestJoin(socket, session.playerId, playerName, avatar, () => {
           currentRoom = room;
           console.log(`[参加承認] ${playerName} → ${roomId} (${room!.playerCount}人)`);
@@ -243,7 +256,8 @@ async function main() {
         return;
       }
 
-      const isInGame = currentRoom.engine.phase !== "waiting";
+      const phase = currentRoom.engine.phase as string;
+      const isInGame = phase !== "waiting" && phase !== "hand_end";
 
       if (isInGame) {
         // ゲーム中: 5秒の猶予後にエンジンから除外（リロード復帰に対応）

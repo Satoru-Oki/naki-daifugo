@@ -2,7 +2,7 @@ import type { GameCard, GameState, ChatMessage, PlayerRank } from "./types";
 
 /** クライアント → サーバー */
 export interface ClientToServerEvents {
-  join_room: (data: { roomId: string; playerName: string; avatar?: string }) => void;
+  join_room: (data: { roomId: string; playerName: string; avatar?: string; gameType?: "daifugo" | "poker" }) => void;
   leave_room: () => void;
   play_card: (data: { cardIds: string[] }) => void;
   pass: () => void;
@@ -28,7 +28,7 @@ export interface ServerToClientEvents {
   round_end: (data: { rankings: { playerId: string; rank: PlayerRank; prevRank: PlayerRank }[] }) => void;
   chat_message: (data: ChatMessage) => void;
   session: (data: { sessionId: string; playerId: string }) => void;
-  reconnected: (data: { roomId: string; playerName: string }) => void;
+  reconnected: (data: { roomId: string; playerName: string; gameType?: "daifugo" | "poker" }) => void;
   game_error: (data: { message: string }) => void;
   room_info: (data: RoomInfo) => void;
   player_joined: (data: { playerId: string; playerName: string }) => void;

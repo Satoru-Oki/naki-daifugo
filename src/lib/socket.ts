@@ -32,35 +32,47 @@ export function clearSessionId(): void {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
-// --- localStorage: 最後のルーム情報（再参加用） ---
+// --- 最後のルーム情報（再参加用） ---
+// sessionStorage（タブ独立）に保存し、別タブ同時プレイでの上書きを防止
+// localStorage にも保存し、タブを閉じても「ゲームに戻る」を可能にする
 
-const LAST_ROOM_KEY = "naki-daifugo-lastRoom";
+const LAST_ROOM_SESSION_KEY = "naki-daifugo-lastRoom";
+const LAST_ROOM_LOCAL_KEY = "naki-daifugo-lastRoom-persist";
 
 export interface LastRoomInfo {
   roomId: string;
   playerName: string;
   avatar?: string;
+  gameType?: "daifugo" | "poker";
 }
 
+/** 現タブのlastRoomを取得（sessionStorage優先 → localStorage fallback） */
 export function getLastRoom(): LastRoomInfo | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(LAST_ROOM_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
+  // sessionStorage（同一タブ）を優先
+  const sessionRaw = sessionStorage.getItem(LAST_ROOM_SESSION_KEY);
+  if (sessionRaw) {
+    try { return JSON.parse(sessionRaw); } catch {}
   }
+  // fallback: localStorage（タブ復帰・再起動後のゲームに戻る用）
+  const localRaw = localStorage.getItem(LAST_ROOM_LOCAL_KEY);
+  if (localRaw) {
+    try { return JSON.parse(localRaw); } catch {}
+  }
+  return null;
 }
 
-export function storeLastRoom(roomId: string, playerName: string, avatar?: string): void {
+export function storeLastRoom(roomId: string, playerName: string, avatar?: string, gameType?: "daifugo" | "poker"): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(LAST_ROOM_KEY, JSON.stringify({ roomId, playerName, avatar }));
+  const data = JSON.stringify({ roomId, playerName, avatar, gameType });
+  sessionStorage.setItem(LAST_ROOM_SESSION_KEY, data);
+  localStorage.setItem(LAST_ROOM_LOCAL_KEY, data);
 }
 
 export function clearLastRoom(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(LAST_ROOM_KEY);
+  sessionStorage.removeItem(LAST_ROOM_SESSION_KEY);
+  localStorage.removeItem(LAST_ROOM_LOCAL_KEY);
 }
 
 // --- Socket管理 ---

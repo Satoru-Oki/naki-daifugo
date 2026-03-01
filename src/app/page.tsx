@@ -147,8 +147,12 @@ export default function GamePage() {
       myIdRef.current = data.playerId;
     });
 
-    // 再接続成功 → ゲーム画面に遷移（game_stateより先に確実に画面切替）
-    socket.on("reconnected", (data: { roomId: string; playerName: string }) => {
+    // 再接続成功 → ゲーム種別が違えばリダイレクト
+    socket.on("reconnected", (data: { roomId: string; playerName: string; gameType?: string }) => {
+      if (data.gameType === "poker") {
+        window.location.href = "/poker";
+        return;
+      }
       setScreen("game");
       notify(`${data.roomId}に再接続しました`);
     });
@@ -336,11 +340,17 @@ export default function GamePage() {
       clearSessionId();
       const lastRoom = getLastRoom();
       if (lastRoom) {
+        // ポーカールームならポーカーページにリダイレクト
+        if (lastRoom.gameType === "poker") {
+          window.location.href = "/poker";
+          return;
+        }
         notify("サーバーが再起動されました。再参加中…");
         socket.emit("join_room", {
           roomId: lastRoom.roomId,
           playerName: lastRoom.playerName,
           avatar: lastRoom.avatar,
+          gameType: "daifugo",
         });
         setScreen("waiting");
       } else {
@@ -371,10 +381,17 @@ export default function GamePage() {
     });
   }, [notify]);
 
-  // マウント時: sessionIdがあれば自動再接続
+  // マウント時: sessionIdがあれば自動再接続（ポーカーならリダイレクト）
   useEffect(() => {
     const sessionId = getStoredSessionId();
     if (!sessionId) return;
+
+    // lastRoomがポーカーならポーカーページにリダイレクト
+    const lastRoom = getLastRoom();
+    if (lastRoom?.gameType === "poker") {
+      window.location.href = "/poker";
+      return;
+    }
 
     const socket = connectSocket();
     socketRef.current = socket;
@@ -389,14 +406,14 @@ export default function GamePage() {
     socketRef.current = socket;
 
     // ルーム情報をlocalStorageに保存（再参加用）
-    storeLastRoom(roomId, playerName, avatar);
+    storeLastRoom(roomId, playerName, avatar, "daifugo");
 
     // リスナーを先に登録してからjoin
     registerSocketListeners(socket);
     startKeepAlive(socket);
 
     const joinRoom = () => {
-      socket.emit("join_room", { roomId, playerName, avatar });
+      socket.emit("join_room", { roomId, playerName, avatar, gameType: "daifugo" });
       setScreen("waiting");
     };
 
@@ -558,7 +575,7 @@ export default function GamePage() {
 
   // --- 画面分岐 ---
   if (screen === "lobby") {
-    return <Lobby onJoinRoom={handleJoinRoom} />;
+    return <Lobby onJoinRoom={handleJoinRoom} gameType="daifugo" />;
   }
 
   if (screen === "waiting" && roomInfo) {

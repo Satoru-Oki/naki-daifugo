@@ -2,19 +2,21 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { clearLastRoom, getLastRoom, type LastRoomInfo } from "@/lib/socket";
 import { AVATARS } from "../../shared/constants";
 import { ScoringRulesModal, GameRulesModal } from "./Scoreboard";
 
 interface LobbyProps {
   onJoinRoom: (playerName: string, roomId: string, avatar?: string) => void;
+  gameType?: "daifugo" | "poker";
 }
 
 function generateRoomId(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-export default function Lobby({ onJoinRoom }: LobbyProps) {
+export default function Lobby({ onJoinRoom, gameType = "daifugo" }: LobbyProps) {
   const [playerName, setPlayerName] = useState("");
   const [roomId, setRoomId] = useState("");
   const [mode, setMode] = useState<"menu" | "join">("menu");
@@ -54,13 +56,14 @@ export default function Lobby({ onJoinRoom }: LobbyProps) {
   };
 
   return (
-    <div className="max-w-[430px] mx-auto min-h-dvh bg-[#2d6b3f]
-      font-sans flex flex-col items-center justify-center px-6 py-8 relative overflow-y-auto">
+    <div className={`max-w-[430px] mx-auto min-h-dvh
+      font-sans flex flex-col items-center justify-center px-6 py-8 relative overflow-y-auto
+      ${gameType === "poker" ? "bg-[#1a3a2a]" : "bg-[#2d6b3f]"}`}>
 
       {/* タイトル */}
       <div className="text-center mb-12 relative">
         <p className="text-xl text-white/90 font-light tracking-[0.5em] mb-3 ml-4 font-[family-name:var(--font-fredoka)]">
-          大富豪
+          {gameType === "poker" ? "ポーカー" : "大富豪"}
         </p>
         <h1 className="text-6xl font-black text-white tracking-tight mb-3">
           Exiles
@@ -208,8 +211,20 @@ export default function Lobby({ onJoinRoom }: LobbyProps) {
         )}
       </div>
 
+      {/* ゲーム切替 */}
+      <div className="mt-6">
+        <Link
+          href={gameType === "poker" ? "/" : "/poker"}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+            bg-white/10 border border-white/20 text-white/80
+            hover:bg-white/20 hover:text-white transition-all text-sm font-medium"
+        >
+          {gameType === "poker" ? "🀄 大富豪で遊ぶ" : "🃏 ポーカーで遊ぶ"}
+        </Link>
+      </div>
+
       {/* ルールボタン */}
-      <div className="mt-8 flex items-center gap-5">
+      <div className="mt-4 flex items-center gap-5">
         <button
           onClick={() => setShowRules(true)}
           className="flex items-center gap-1.5 text-white/60 hover:text-white/90 transition-colors text-sm"
