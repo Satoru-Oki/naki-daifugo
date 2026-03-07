@@ -378,17 +378,22 @@ export class GameRoom {
         return;
       }
 
-      if (result.revolution) {
-        this.broadcast("notification", { message: "🔄 革命発動！" });
+      if (result.revolution && result.eightCut) {
+        // 革命+8切り同時: 1つの通知にまとめる（8切り演出は出さない）
+        this.broadcast("notification", { message: "🔄 革命発動！8切り！" });
+      } else {
+        if (result.revolution) {
+          this.broadcast("notification", { message: "🔄 革命発動！" });
+        }
+
+        if (result.eightCut) {
+          this.broadcast("notification", { message: "✂️ 8切り！", cards: result.eightCutCards });
+        }
       }
 
       if (result.elevenBack) {
         const state = this.engine.isElevenBack ? "発動！" : "解除！";
         this.broadcast("notification", { message: `⏬ イレブンバック${state}` });
-      }
-
-      if (result.eightCut) {
-        this.broadcast("notification", { message: "✂️ 8切り！", cards: result.eightCutCards });
       }
 
       if (result.spade3Cut) {
@@ -428,7 +433,7 @@ export class GameRoom {
           }
         }, 3000);
       } else if (result.eightCut) {
-        // 8切り: 場のカードを表示してから流す（革命との併発時に場が見えるようにする）
+        // 8切り: 場のカードを3.5秒表示してから流す
         this.eightCutTimer = setTimeout(() => {
           this.eightCutTimer = null;
           this.engine.resolveEightCut();
@@ -438,7 +443,7 @@ export class GameRoom {
           } else {
             this.scheduleAutoPass();
           }
-        }, 500);
+        }, 3500);
       } else if (result.nakiChance) {
         this.startNakiWindow();
       } else if (this.engine.phase === "round_end") {

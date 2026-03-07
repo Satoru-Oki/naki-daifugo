@@ -277,7 +277,7 @@ export default function GamePage() {
       // プレイヤー名からアバターを引くヘルパー
       const findPlayer = (name: string) => playersRef.current.find((p) => p.name === name);
 
-      if (data.message.includes("8切り")) {
+      if (data.message.includes("8切り") && data.cards) {
         announce("✂️ 8切り！", "eightCut", data.cards);
         return;
       }
