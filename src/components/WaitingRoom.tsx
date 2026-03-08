@@ -14,6 +14,8 @@ interface WaitingRoomProps {
   myId: string;
   onStartGame: () => void;
   onLeave: () => void;
+  onAddCpu?: () => void;
+  onRemoveCpu?: (cpuId: string) => void;
   messages: ChatMessage[];
   onSendChat: (text: string) => void;
   onVoiceStamp: (stampId: string) => void;
@@ -28,7 +30,7 @@ interface WaitingRoomProps {
 }
 
 export default function WaitingRoom({
-  roomInfo, myId, onStartGame, onLeave, messages, onSendChat, onVoiceStamp,
+  roomInfo, myId, onStartGame, onLeave, onAddCpu, onRemoveCpu, messages, onSendChat, onVoiceStamp,
   inVoice, voiceUsers, micEnabled, speakerEnabled,
   onJoinVoice, onLeaveVoice, onToggleMic, onToggleSpeaker,
 }: WaitingRoomProps) {
@@ -109,6 +111,26 @@ export default function WaitingRoom({
                   HOST
                 </span>
               )}
+
+              {/* CPUバッジ */}
+              {player.isCpu && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold
+                  bg-blue-400/10 text-blue-400 border border-blue-400/25">
+                  CPU
+                </span>
+              )}
+
+              {/* CPU削除ボタン（ホストのみ） */}
+              {player.isCpu && isHost && (
+                <button
+                  onClick={() => onRemoveCpu?.(player.id)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center
+                    text-red-400/60 hover:text-red-400 hover:bg-red-400/10
+                    transition-colors text-xs"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           ))}
 
@@ -125,6 +147,19 @@ export default function WaitingRoom({
               <span className="text-sm text-[#3a5a3e]">待機中...</span>
             </div>
           ))}
+
+          {/* CPU追加ボタン（ホストのみ、空きがある場合） */}
+          {isHost && roomInfo.players.length < roomInfo.maxPlayers && (
+            <button
+              onClick={onAddCpu}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border
+                border-dashed border-blue-400/30 text-blue-400/70 hover:text-blue-400
+                hover:border-blue-400/50 hover:bg-blue-400/5 transition-colors text-sm"
+            >
+              <span className="text-lg">+</span>
+              CPU追加
+            </button>
+          )}
         </div>
 
         {/* ルールボタン */}

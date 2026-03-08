@@ -18,6 +18,8 @@ export interface ClientToServerEvents {
   voice_join: () => void;
   voice_leave: () => void;
   voice_signal: (data: { targetId: string; signal: unknown }) => void;
+  add_cpu: () => void;
+  remove_cpu: (data: { cpuId: string }) => void;
 }
 
 /** サーバー → クライアント */
@@ -60,6 +62,7 @@ export interface ClientGameState {
     finished: boolean;
     totalScore: number;
     avatar?: string;
+    isCpu?: boolean;
   }[];
   scores: { id: string; name: string; score: number; avatar?: string }[];
   currentTurn: string;
@@ -80,7 +83,7 @@ export interface ClientGameState {
 /** ルーム情報 */
 export interface RoomInfo {
   roomId: string;
-  players: { id: string; name: string; isHost: boolean; avatar?: string }[];
+  players: { id: string; name: string; isHost: boolean; avatar?: string; isCpu?: boolean }[];
   maxPlayers: number;
   isStarted: boolean;
 }

@@ -1,15 +1,17 @@
 import { Server, Socket } from "socket.io";
 import { GameEngine } from "./GameEngine";
 import { canNaki } from "../../shared/gameLogic";
+import { decidePlay, shouldNaki, chooseExchangeCards } from "./CpuPlayer";
 import type { ClientToServerEvents, ServerToClientEvents, ClientGameState, RoomInfo } from "../../shared/events";
 
 type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 interface RoomPlayer {
-  socket: GameSocket;
+  socket: GameSocket | null;
   id: string;
   name: string;
   isHost: boolean;
+  isCpu: boolean;
   avatar?: string;
 }
 
@@ -20,6 +22,8 @@ interface PendingJoin {
   avatar?: string;
   onAccepted?: () => void;
 }
+
+const CPU_NAMES = ["CPU Alpha", "CPU Beta", "CPU Gamma", "CPU Delta"];
 
 export class GameRoom {
   id: string;
@@ -36,12 +40,51 @@ export class GameRoom {
   private autoPassTimer: ReturnType<typeof setTimeout> | null = null;
   private spade3CutTimer: ReturnType<typeof setTimeout> | null = null;
   private eightCutTimer: ReturnType<typeof setTimeout> | null = null;
+  private cpuCounter = 0;
+  private cpuActionTimer: ReturnType<typeof setTimeout> | null = null;
+  private cpuNakiTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(io: Server, roomId: string, maxPlayers = 5) {
     this.io = io;
     this.id = roomId;
     this.maxPlayers = maxPlayers;
     this.engine = new GameEngine();
+  }
+
+  /** CPU追加 */
+  addCpu(): string | null {
+    if (this.players.length >= this.maxPlayers) return null;
+    if (this.engine.phase !== "waiting") return null;
+
+    const cpuId = `cpu-${Date.now()}-${this.cpuCounter}`;
+    const nameIdx = this.cpuCounter % CPU_NAMES.length;
+    const cpuName = CPU_NAMES[nameIdx];
+    this.cpuCounter++;
+
+    const player: RoomPlayer = {
+      socket: null,
+      id: cpuId,
+      name: cpuName,
+      isHost: false,
+      isCpu: true,
+    };
+
+    this.players.push(player);
+    this.engine.addPlayer(cpuId, cpuName);
+    this.broadcastRoomInfo();
+    return cpuId;
+  }
+
+  /** CPU削除 */
+  removeCpu(cpuId: string): boolean {
+    const player = this.players.find((p) => p.id === cpuId && p.isCpu);
+    if (!player) return false;
+    if (this.engine.phase !== "waiting") return false;
+
+    this.players = this.players.filter((p) => p.id !== cpuId);
+    this.engine.removePlayer(cpuId);
+    this.broadcastRoomInfo();
+    return true;
   }
 
   /** プレイヤー参加 */
@@ -55,6 +98,7 @@ export class GameRoom {
       id: playerId,
       name: playerName,
       isHost,
+      isCpu: false,
       avatar,
     };
 
@@ -107,6 +151,7 @@ export class GameRoom {
       id: playerId,
       name,
       isHost: false,
+      isCpu: false,
       avatar,
     };
 
@@ -229,7 +274,7 @@ export class GameRoom {
     this.disconnectedPlayerIds.delete(playerId);
 
     const player = this.players.find((p) => p.id === playerId);
-    if (player) {
+    if (player?.socket) {
       player.socket.leave(this.id);
     }
     this.players = this.players.filter((p) => p.id !== playerId);
@@ -258,9 +303,10 @@ export class GameRoom {
         }
       }
 
-      // ホスト移譲
+      // ホスト移譲（CPUでないプレイヤーに）
       if (!this.players.some((p) => p.isHost)) {
-        this.players[0].isHost = true;
+        const humanPlayer = this.players.find((p) => !p.isCpu);
+        if (humanPlayer) humanPlayer.isHost = true;
       }
       this.broadcastRoomInfo();
     }
@@ -310,6 +356,7 @@ export class GameRoom {
 
   /** 特定プレイヤーにゲーム状態を送信 */
   sendGameStateTo(player: RoomPlayer): void {
+    if (!player.socket) return;
     if (this.engine.phase === "waiting" || this.engine.players.length === 0) return;
     if (!this.engine.currentPlayer) return;
     const scores = this.engine.players.map((p) => ({ id: p.id, name: p.name, score: p.totalScore, avatar: p.avatar }));
@@ -317,7 +364,10 @@ export class GameRoom {
       phase: this.engine.phase,
       hand: this.engine.getHand(player.id),
       field: this.engine.field,
-      players: this.engine.getPlayerInfo(player.id),
+      players: this.engine.getPlayerInfo(player.id).map((p) => ({
+        ...p,
+        isCpu: this.players.find((rp) => rp.id === p.id)?.isCpu,
+      })),
       currentTurn: this.engine.currentPlayer.id,
       isRevolution: this.engine.isRevolution,
       isElevenBack: this.engine.isElevenBack,
@@ -334,6 +384,7 @@ export class GameRoom {
 
   /** 特定プレイヤーにルーム情報を送信 */
   sendRoomInfoTo(player: RoomPlayer): void {
+    if (!player.socket) return;
     const info: RoomInfo = {
       roomId: this.id,
       players: this.players.map((p) => ({
@@ -341,6 +392,7 @@ export class GameRoom {
         name: p.name,
         isHost: p.isHost,
         avatar: p.avatar,
+        isCpu: p.isCpu || undefined,
       })),
       maxPlayers: this.maxPlayers,
       isStarted: this.engine.phase !== "waiting",
@@ -369,6 +421,7 @@ export class GameRoom {
       this.engine.startGame();
       this.broadcastGameState();
       this.broadcast("notification", { message: "ゲーム開始！" });
+      this.scheduleCpuAction();
     });
 
     socket.on("play_card", (data) => {
@@ -378,79 +431,7 @@ export class GameRoom {
         return;
       }
 
-      if (result.revolution && result.eightCut) {
-        // 革命+8切り同時: 1つの通知にまとめる（8切り演出は出さない）
-        this.broadcast("notification", { message: "🔄 革命発動！8切り！" });
-      } else {
-        if (result.revolution) {
-          this.broadcast("notification", { message: "🔄 革命発動！" });
-        }
-
-        if (result.eightCut) {
-          this.broadcast("notification", { message: "✂️ 8切り！", cards: result.eightCutCards });
-        }
-      }
-
-      if (result.elevenBack) {
-        const state = this.engine.isElevenBack ? "発動！" : "解除！";
-        this.broadcast("notification", { message: `⏬ イレブンバック${state}` });
-      }
-
-      if (result.spade3Cut) {
-        this.broadcast("notification", { message: "♠3でジョーカー返し！" });
-      }
-
-      if (result.playerFinished) {
-        const player = this.players.find((p) => p.id === playerId);
-        const enginePlayer = this.engine.players.find((p) => p.id === playerId);
-        if (enginePlayer?.finishOrder === 1) {
-          if (enginePlayer.prevRank === "大貧民") {
-            this.broadcast("notification", { message: `${player?.name}が下剋上！` });
-          } else {
-            this.broadcast("notification", { message: `${player?.name}が大富豪！` });
-          }
-        } else {
-          this.broadcast("notification", { message: `🎉 ${player?.name}が上がり！` });
-        }
-      }
-
-      if (result.miyakoOchi) {
-        this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
-      }
-
-      this.broadcastGameState();
-
-      if (result.spade3Cut) {
-        // ♠3を場に表示した状態で3秒待ってから流す
-        this.spade3CutTimer = setTimeout(() => {
-          this.spade3CutTimer = null;
-          this.engine.resolveSpade3Cut();
-          this.broadcastGameState();
-          if (this.engine.phase === "round_end") {
-            this.endRound();
-          } else {
-            this.scheduleAutoPass();
-          }
-        }, 3000);
-      } else if (result.eightCut) {
-        // 8切り: 場のカードを3.5秒表示してから流す
-        this.eightCutTimer = setTimeout(() => {
-          this.eightCutTimer = null;
-          this.engine.resolveEightCut();
-          this.broadcastGameState();
-          if (this.engine.phase === "round_end") {
-            this.endRound();
-          } else {
-            this.scheduleAutoPass();
-          }
-        }, 3500);
-      } else if (result.nakiChance) {
-        this.startNakiWindow();
-      } else if (this.engine.phase === "round_end") {
-        this.endRound();
-      } else {
-        this.scheduleAutoPass();
-      }
+      this.handlePlayResult(playerId, result);
     });
 
     socket.on("pass", () => {
@@ -470,45 +451,12 @@ export class GameRoom {
         this.endRound();
       } else {
         this.scheduleAutoPass();
+        this.scheduleCpuAction();
       }
     });
 
     socket.on("intercept", () => {
-      const result = this.engine.doIntercept(playerId);
-      if (!result.success) {
-        socket.emit("game_error", { message: result.error! });
-        return;
-      }
-
-      const player = this.players.find((p) => p.id === playerId);
-      this.broadcast("intercept_result", {
-        playerId,
-        playerName: player?.name || "",
-        cards: result.cards || [],
-      });
-
-      if (result.playerFinished) {
-        const enginePlayer = this.engine.players.find((p) => p.id === playerId);
-        if (enginePlayer?.finishOrder === 1) {
-          if (enginePlayer.prevRank === "大貧民") {
-            this.broadcast("notification", { message: `${player?.name}が下剋上！` });
-          } else {
-            this.broadcast("notification", { message: `${player?.name}が大富豪！` });
-          }
-        } else {
-          this.broadcast("notification", { message: `🎉 ${player?.name}が鳴き上がり！` });
-        }
-      }
-
-      if (result.miyakoOchi) {
-        this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
-      }
-
-      this.broadcastGameState();
-
-      if (this.engine.phase === "round_end") {
-        this.endRound();
-      }
+      this.handleIntercept(playerId);
     });
 
     socket.on("skip_intercept", () => {
@@ -527,6 +475,7 @@ export class GameRoom {
         this.endRound();
       } else {
         this.scheduleAutoPass();
+        this.scheduleCpuAction();
       }
     });
 
@@ -543,6 +492,7 @@ export class GameRoom {
       this.broadcastGameState();
       if (result.allDone) {
         this.broadcast("notification", { message: `ラウンド${this.engine.round} 開始！` });
+        this.scheduleCpuAction();
       }
     });
 
@@ -616,10 +566,251 @@ export class GameRoom {
 
     socket.on("voice_signal", (data) => {
       const target = this.players.find((p) => p.id === data.targetId);
-      if (target) {
+      if (target?.socket) {
         target.socket.emit("voice_signal", { fromId: playerId, signal: data.signal });
       }
     });
+
+    socket.on("add_cpu", () => {
+      const player = this.players.find((p) => p.id === playerId);
+      if (!player?.isHost) {
+        socket.emit("game_error", { message: "ホストのみCPUを追加できます" });
+        return;
+      }
+      const cpuId = this.addCpu();
+      if (!cpuId) {
+        socket.emit("game_error", { message: "CPUを追加できません（満員または開始済み）" });
+      }
+    });
+
+    socket.on("remove_cpu", (data) => {
+      const player = this.players.find((p) => p.id === playerId);
+      if (!player?.isHost) {
+        socket.emit("game_error", { message: "ホストのみCPUを削除できます" });
+        return;
+      }
+      if (!this.removeCpu(data.cpuId)) {
+        socket.emit("game_error", { message: "CPUを削除できません" });
+      }
+    });
+  }
+
+  /** play_card / CPU play の結果処理（共通） */
+  private handlePlayResult(playerId: string, result: ReturnType<GameEngine["playCards"]>): void {
+    if (result.revolution && result.eightCut) {
+      this.broadcast("notification", { message: "🔄 革命発動！8切り！" });
+    } else {
+      if (result.revolution) {
+        this.broadcast("notification", { message: "🔄 革命発動！" });
+      }
+      if (result.eightCut) {
+        this.broadcast("notification", { message: "✂️ 8切り！", cards: result.eightCutCards });
+      }
+    }
+
+    if (result.elevenBack) {
+      const state = this.engine.isElevenBack ? "発動！" : "解除！";
+      this.broadcast("notification", { message: `⏬ イレブンバック${state}` });
+    }
+
+    if (result.spade3Cut) {
+      this.broadcast("notification", { message: "♠3でジョーカー返し！" });
+    }
+
+    if (result.playerFinished) {
+      const player = this.players.find((p) => p.id === playerId);
+      const enginePlayer = this.engine.players.find((p) => p.id === playerId);
+      if (enginePlayer?.finishOrder === 1) {
+        if (enginePlayer.prevRank === "大貧民") {
+          this.broadcast("notification", { message: `${player?.name}が下剋上！` });
+        } else {
+          this.broadcast("notification", { message: `${player?.name}が大富豪！` });
+        }
+      } else {
+        this.broadcast("notification", { message: `🎉 ${player?.name}が上がり！` });
+      }
+    }
+
+    if (result.miyakoOchi) {
+      this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
+    }
+
+    this.broadcastGameState();
+
+    if (result.spade3Cut) {
+      this.spade3CutTimer = setTimeout(() => {
+        this.spade3CutTimer = null;
+        this.engine.resolveSpade3Cut();
+        this.broadcastGameState();
+        if (this.engine.phase === "round_end") {
+          this.endRound();
+        } else {
+          this.scheduleAutoPass();
+          this.scheduleCpuAction();
+        }
+      }, 3000);
+    } else if (result.eightCut) {
+      this.eightCutTimer = setTimeout(() => {
+        this.eightCutTimer = null;
+        this.engine.resolveEightCut();
+        this.broadcastGameState();
+        if (this.engine.phase === "round_end") {
+          this.endRound();
+        } else {
+          this.scheduleAutoPass();
+          this.scheduleCpuAction();
+        }
+      }, 3500);
+    } else if (result.nakiChance) {
+      this.startNakiWindow();
+    } else if (this.engine.phase === "round_end") {
+      this.endRound();
+    } else {
+      this.scheduleAutoPass();
+      this.scheduleCpuAction();
+    }
+  }
+
+  /** intercept 処理（人間・CPU共通） */
+  private handleIntercept(playerId: string): void {
+    const result = this.engine.doIntercept(playerId);
+    if (!result.success) return;
+
+    const player = this.players.find((p) => p.id === playerId);
+    this.broadcast("intercept_result", {
+      playerId,
+      playerName: player?.name || "",
+      cards: result.cards || [],
+    });
+
+    if (result.playerFinished) {
+      const enginePlayer = this.engine.players.find((p) => p.id === playerId);
+      if (enginePlayer?.finishOrder === 1) {
+        if (enginePlayer.prevRank === "大貧民") {
+          this.broadcast("notification", { message: `${player?.name}が下剋上！` });
+        } else {
+          this.broadcast("notification", { message: `${player?.name}が大富豪！` });
+        }
+      } else {
+        this.broadcast("notification", { message: `🎉 ${player?.name}が鳴き上がり！` });
+      }
+    }
+
+    if (result.miyakoOchi) {
+      this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
+    }
+
+    this.broadcastGameState();
+
+    if (this.engine.phase === "round_end") {
+      this.endRound();
+    } else {
+      this.scheduleCpuAction();
+    }
+  }
+
+  /** CPUのターンなら遅延実行をスケジュール */
+  private scheduleCpuAction(): void {
+    if (this.cpuActionTimer) {
+      clearTimeout(this.cpuActionTimer);
+      this.cpuActionTimer = null;
+    }
+
+    if (this.engine.phase !== "playing") return;
+    if (!this.engine.currentPlayer) return;
+
+    const currentId = this.engine.currentPlayer.id;
+    const roomPlayer = this.players.find((p) => p.id === currentId);
+    if (!roomPlayer?.isCpu) return;
+
+    // 1〜2秒のランダム遅延
+    const delay = 1000 + Math.random() * 1000;
+    this.cpuActionTimer = setTimeout(() => {
+      this.cpuActionTimer = null;
+      this.executeCpuAction(currentId);
+    }, delay);
+  }
+
+  /** CPU行動を実行 */
+  private executeCpuAction(cpuId: string): void {
+    if (this.engine.phase !== "playing") return;
+    if (!this.engine.currentPlayer || this.engine.currentPlayer.id !== cpuId) return;
+
+    const enginePlayer = this.engine.players.find((p) => p.id === cpuId);
+    if (!enginePlayer) return;
+
+    const decision = decidePlay({
+      hand: enginePlayer.hand,
+      field: this.engine.field,
+      fieldType: this.engine.fieldType,
+      isRevolution: this.engine.isRevolution,
+      isElevenBack: this.engine.isElevenBack,
+      discardPile: this.engine.discardPile,
+    });
+
+    if (decision.action === "play") {
+      const result = this.engine.playCards(cpuId, decision.cardIds);
+      if (result.success) {
+        this.handlePlayResult(cpuId, result);
+      } else {
+        // フォールバック: パス
+        const passResult = this.engine.doPass(cpuId);
+        if (passResult.success) {
+          if (passResult.fieldCleared) {
+            this.broadcast("notification", { message: "場が流れました" });
+          }
+          this.broadcastGameState();
+          if ((this.engine.phase as string) === "round_end") {
+            this.endRound();
+          } else {
+            this.scheduleAutoPass();
+            this.scheduleCpuAction();
+          }
+        }
+      }
+    } else {
+      const result = this.engine.doPass(cpuId);
+      if (!result.success) return;
+
+      if (result.fieldCleared) {
+        this.broadcast("notification", { message: "場が流れました" });
+      }
+
+      this.broadcastGameState();
+
+      if ((this.engine.phase as string) === "round_end") {
+        this.endRound();
+      } else {
+        this.scheduleAutoPass();
+        this.scheduleCpuAction();
+      }
+    }
+  }
+
+  /** CPUのカード交換を自動実行 */
+  private executeCpuExchanges(): void {
+    if (this.engine.phase !== "card_exchange") return;
+
+    for (const rp of this.players) {
+      if (!rp.isCpu) continue;
+      const entry = this.engine.exchangeState.get(rp.id);
+      if (!entry || entry.given) continue;
+
+      const ep = this.engine.players.find((p) => p.id === rp.id);
+      if (!ep) continue;
+
+      const cardIds = chooseExchangeCards(ep.hand, entry.toGive, this.engine.isRevolution);
+      this.engine.doCardExchange(rp.id, cardIds);
+    }
+
+    // 全員完了チェック
+    if ((this.engine.phase as string) === "playing") {
+      this.broadcastGameState();
+      this.broadcast("notification", { message: `ラウンド${this.engine.round} 開始！` });
+      this.scheduleCpuAction();
+    } else {
+      this.broadcastGameState();
+    }
   }
 
   /** 切断中プレイヤーのターンなら自動パスをスケジュール */
@@ -638,13 +829,21 @@ export class GameRoom {
     if (!this.engine.currentPlayer) return;
 
     const currentId = this.engine.currentPlayer.id;
+    // CPUは自動パスの対象外（scheduleCpuActionで処理）
+    const roomPlayer = this.players.find((p) => p.id === currentId);
+    if (roomPlayer?.isCpu) return;
+
     if (!this.disconnectedPlayerIds.has(currentId)) return;
 
     // 接続中のアクティブプレイヤーが0人なら無限ループ防止のため停止
     const hasConnectedActive = this.engine.players.some(
       (p) => !p.finished && !this.disconnectedPlayerIds.has(p.id)
     );
-    if (!hasConnectedActive) return;
+    // CPUは常にアクティブとみなす
+    const hasCpuActive = this.engine.players.some(
+      (p) => !p.finished && this.players.find((rp) => rp.id === p.id)?.isCpu
+    );
+    if (!hasConnectedActive && !hasCpuActive) return;
 
     const result = this.engine.doPass(currentId);
     if (!result.success) return;
@@ -665,16 +864,75 @@ export class GameRoom {
     } else {
       // 次のターンも切断中プレイヤーかもしれないので再チェック
       this.scheduleAutoPass();
+      this.scheduleCpuAction();
     }
   }
 
-  /** 鳴きウィンドウ開始（鳴ける人のみに送信） */
+  /** 鳴きウィンドウ開始（鳴ける人のみに送信 + CPU鳴き判定） */
   private startNakiWindow(): void {
     const card = this.engine.field[0];
+    let hasCpuCanNaki = false;
+
     for (const rp of this.players) {
       const ep = this.engine.players.find((p) => p.id === rp.id);
       if (ep && !ep.finished && canNaki(card, ep.hand).possible) {
-        rp.socket.emit("intercept_window", { card });
+        if (rp.isCpu) {
+          hasCpuCanNaki = true;
+        } else if (rp.socket) {
+          rp.socket.emit("intercept_window", { card });
+        }
+      }
+    }
+
+    // CPU鳴き判定を800ms後にスケジュール
+    if (hasCpuCanNaki) {
+      if (this.cpuNakiTimer) clearTimeout(this.cpuNakiTimer);
+      this.cpuNakiTimer = setTimeout(() => {
+        this.cpuNakiTimer = null;
+        this.executeCpuNaki();
+      }, 800);
+    }
+  }
+
+  /** CPU鳴き実行 */
+  private executeCpuNaki(): void {
+    if (this.engine.phase !== "naki_chance") return;
+    const card = this.engine.field[0];
+    if (!card) return;
+
+    // 鳴けるCPUを探す
+    for (const rp of this.players) {
+      if (!rp.isCpu) continue;
+      const ep = this.engine.players.find((p) => p.id === rp.id);
+      if (!ep || ep.finished) continue;
+      if (!canNaki(card, ep.hand).possible) continue;
+
+      if (shouldNaki(ep.hand, card)) {
+        this.handleIntercept(rp.id);
+        return;
+      }
+    }
+
+    // 鳴かない → 鳴きウィンドウを解決
+    // ただし人間プレイヤーもまだ判断中かもしれないので、人間で鳴ける人がいるかチェック
+    const humanCanNaki = this.players.some((rp) => {
+      if (rp.isCpu) return false;
+      const ep = this.engine.players.find((p) => p.id === rp.id);
+      return ep && !ep.finished && canNaki(card, ep.hand).possible;
+    });
+
+    if (!humanCanNaki) {
+      // 人間で鳴ける人がいない → 解決
+      const nakiResult = this.engine.resolveNakiWindow();
+      if (nakiResult.eightCut) {
+        this.broadcast("notification", { message: "✂️ 8切り！", cards: nakiResult.eightCutCards });
+      }
+      this.broadcastGameState();
+      if ((this.engine.phase as string) === "round_end") {
+        this.endRound();
+      } else {
+        this.scheduleAutoPass();
+        this.scheduleCpuAction();
       }
     }
   }
@@ -682,6 +940,10 @@ export class GameRoom {
   /** 鳴きウィンドウを強制解決（切断時用） */
   private resolveNakiIfNeeded(): void {
     if (this.engine.phase !== "naki_chance") return;
+    if (this.cpuNakiTimer) {
+      clearTimeout(this.cpuNakiTimer);
+      this.cpuNakiTimer = null;
+    }
     const nakiResult = this.engine.resolveNakiWindow();
     if (nakiResult.eightCut) {
       this.broadcast("notification", { message: "✂️ 8切り！", cards: nakiResult.eightCutCards });
@@ -691,6 +953,7 @@ export class GameRoom {
       this.endRound();
     } else {
       this.scheduleAutoPass();
+      this.scheduleCpuAction();
     }
   }
 
@@ -722,7 +985,8 @@ export class GameRoom {
 
       // 切断後に再接続したプレイヤーをエンジンに再追加
       for (const rp of this.players) {
-        if (!this.engine.players.find((ep) => ep.id === rp.id) && rp.socket.connected) {
+        const inEngine = this.engine.players.find((ep) => ep.id === rp.id);
+        if (!inEngine && (rp.isCpu || (rp.socket && rp.socket.connected))) {
           const savedScore = this.disconnectedScores.get(rp.id) || 0;
           this.engine.addPlayer(rp.id, rp.name, rp.avatar);
           const ep = this.engine.players.find((p) => p.id === rp.id);
@@ -743,13 +1007,18 @@ export class GameRoom {
       // 大貧民/貧民の自動交換を実行
       if (this.engine.phase === "card_exchange") {
         this.engine.executeAutoExchanges();
+        // CPUの交換を自動実行
+        this.executeCpuExchanges();
       }
 
       this.broadcastGameState();
       if (this.engine.phase === "playing") {
         this.broadcast("notification", { message: `ラウンド${this.engine.round} 開始！` });
+        this.scheduleCpuAction();
       } else if (this.engine.phase === "card_exchange") {
         this.broadcast("notification", { message: "カード交換フェーズ" });
+        // まだ交換中の場合もCPU交換を試行
+        this.executeCpuExchanges();
       }
     }, 3000);
   }
@@ -759,12 +1028,16 @@ export class GameRoom {
     if (this.engine.players.length === 0) return;
     if (!this.engine.currentPlayer) return;
     for (const player of this.players) {
+      if (!player.socket) continue; // CPUはスキップ
       const scores = this.engine.players.map((p) => ({ id: p.id, name: p.name, score: p.totalScore, avatar: p.avatar }));
       const state: ClientGameState = {
         phase: this.engine.phase,
         hand: this.engine.getHand(player.id),
         field: this.engine.field,
-        players: this.engine.getPlayerInfo(player.id),
+        players: this.engine.getPlayerInfo(player.id).map((p) => ({
+          ...p,
+          isCpu: this.players.find((rp) => rp.id === p.id)?.isCpu,
+        })),
         currentTurn: this.engine.currentPlayer.id,
         isRevolution: this.engine.isRevolution,
         isElevenBack: this.engine.isElevenBack,
@@ -792,6 +1065,7 @@ export class GameRoom {
         name: p.name,
         isHost: p.isHost,
         avatar: p.avatar,
+        isCpu: p.isCpu || undefined,
       })),
       maxPlayers: this.maxPlayers,
       isStarted: this.engine.phase !== "waiting",

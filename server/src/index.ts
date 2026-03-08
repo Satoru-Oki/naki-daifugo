@@ -167,7 +167,7 @@ async function main() {
       // 名前マッチ再接続: 同名プレイヤーがいれば復帰（全フェーズ対応）
       const existingPlayer = room.players.find((p) => p.name === playerName);
       if (existingPlayer) {
-        console.log(`[名前マッチ発見] ${playerName} (socket.connected=${existingPlayer.socket.connected}, phase=${room.engine.phase})`);
+        console.log(`[名前マッチ発見] ${playerName} (socket.connected=${existingPlayer.socket?.connected}, phase=${room.engine.phase})`);
 
         // 既存セッションのgrace periodをキャンセル + セッション削除
         const oldSessionId = sessionManager.findSessionByPlayerId(existingPlayer.id);
@@ -185,9 +185,10 @@ async function main() {
         }
 
         // 旧ソケットがまだ接続中なら通知を送ってから強制切断
-        if (existingPlayer.socket.connected) {
-          existingPlayer.socket.emit("replaced");
-          existingPlayer.socket.disconnect(true);
+        const oldSocket = existingPlayer.socket as { connected: boolean; emit: (ev: string) => void; disconnect: (close?: boolean) => void } | null;
+        if (oldSocket?.connected) {
+          oldSocket.emit("replaced");
+          oldSocket.disconnect(true);
         }
 
         // 既存playerIdで新セッション作成

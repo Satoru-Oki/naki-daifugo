@@ -208,7 +208,7 @@ export default function GamePage() {
       }
       prevTurnRef.current = state.currentTurn;
       // 革命が発動したら派手に演出
-      if (state.isRevolution && !prevRevolutionRef.current) {
+      if (state.isRevolution !== prevRevolutionRef.current) {
         playRevolution();
         announce("革命発動！！", "revolution");
       }
@@ -313,8 +313,11 @@ export default function GamePage() {
         if (!miyakoOchiThisRoundRef.current) {
           const name = data.message.split("が")[0];
           const p = findPlayer(name);
-          setTimeout(() => playDaihinmin(), 1000);
-          announce("大貧民", "daihinmin", undefined, name, p?.avatar, 4000);
+          // 大富豪/下剋上演出(4秒)の後に大貧民を表示（同時到着による上書き防止）
+          setTimeout(() => {
+            setTimeout(() => playDaihinmin(), 1000);
+            announce("大貧民", "daihinmin", undefined, name, p?.avatar, 4000);
+          }, 4200);
         }
         return;
       }
@@ -570,6 +573,14 @@ export default function GamePage() {
     socketRef.current?.emit("card_exchange", { cardIds });
   }, []);
 
+  const handleAddCpu = useCallback(() => {
+    socketRef.current?.emit("add_cpu");
+  }, []);
+
+  const handleRemoveCpu = useCallback((cpuId: string) => {
+    socketRef.current?.emit("remove_cpu", { cpuId });
+  }, []);
+
   const currentTurnName = players.find((p) => p.id === currentTurn)?.name
     || (currentTurn === myId ? "you" : "");
 
@@ -587,6 +598,8 @@ export default function GamePage() {
         myId={myId}
         onStartGame={handleStartGame}
         onLeave={handleLeave}
+        onAddCpu={handleAddCpu}
+        onRemoveCpu={handleRemoveCpu}
         messages={messages}
         onSendChat={sendChat}
         onVoiceStamp={sendVoiceStamp}
