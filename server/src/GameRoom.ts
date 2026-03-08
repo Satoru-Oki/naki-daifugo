@@ -620,18 +620,28 @@ export class GameRoom {
     if (result.playerFinished) {
       const player = this.players.find((p) => p.id === playerId);
       const enginePlayer = this.engine.players.find((p) => p.id === playerId);
-      if (enginePlayer?.finishOrder === 1) {
-        if (enginePlayer.prevRank === "大貧民") {
-          this.broadcast("notification", { message: `${player?.name}が下剋上！` });
+      // 革命と同時に上がった場合、革命演出(約3秒)の後に上がり演出を出す
+      const finishDelay = result.revolution ? 3500 : 0;
+      const sendFinishNotification = () => {
+        if (enginePlayer?.finishOrder === 1) {
+          if (enginePlayer.prevRank === "大貧民") {
+            this.broadcast("notification", { message: `${player?.name}が下剋上！` });
+          } else {
+            this.broadcast("notification", { message: `${player?.name}が大富豪！` });
+          }
         } else {
-          this.broadcast("notification", { message: `${player?.name}が大富豪！` });
+          this.broadcast("notification", { message: `🎉 ${player?.name}が上がり！` });
         }
+        if (result.miyakoOchi) {
+          this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
+        }
+      };
+      if (finishDelay > 0) {
+        setTimeout(sendFinishNotification, finishDelay);
       } else {
-        this.broadcast("notification", { message: `🎉 ${player?.name}が上がり！` });
+        sendFinishNotification();
       }
-    }
-
-    if (result.miyakoOchi) {
+    } else if (result.miyakoOchi) {
       this.broadcast("notification", { message: `都落ち！${result.miyakoOchi.playerName}のカードは破棄！` });
     }
 
