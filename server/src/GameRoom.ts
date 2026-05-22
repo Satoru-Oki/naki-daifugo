@@ -597,14 +597,18 @@ export class GameRoom {
 
   /** play_card / CPU play の結果処理（共通） */
   private handlePlayResult(playerId: string, result: ReturnType<GameEngine["playCards"]>): void {
-    if (result.revolution && result.eightCut) {
-      this.broadcast("notification", { message: "🔄 革命発動！8切り！" });
-    } else {
+    if (result.revolution) {
+      this.broadcast("notification", { message: "🔄 革命発動！" });
+    }
+    if (result.eightCut) {
+      // 革命と同時発火の場合は革命演出(約3秒)の後に8切り演出を出す
+      const eightCutCards = result.eightCutCards;
       if (result.revolution) {
-        this.broadcast("notification", { message: "🔄 革命発動！" });
-      }
-      if (result.eightCut) {
-        this.broadcast("notification", { message: "✂️ 8切り！", cards: result.eightCutCards });
+        setTimeout(() => {
+          this.broadcast("notification", { message: "✂️ 8切り！", cards: eightCutCards });
+        }, 3000);
+      } else {
+        this.broadcast("notification", { message: "✂️ 8切り！", cards: eightCutCards });
       }
     }
 
@@ -621,7 +625,10 @@ export class GameRoom {
       const player = this.players.find((p) => p.id === playerId);
       const enginePlayer = this.engine.players.find((p) => p.id === playerId);
       // 革命と同時に上がった場合、革命演出(約3秒)の後に上がり演出を出す
-      const finishDelay = result.revolution ? 3500 : 0;
+      // さらに8切りも同時発火の場合は8切り演出も挟むため追加で約3秒待つ
+      const finishDelay = result.revolution
+        ? (result.eightCut ? 6500 : 3500)
+        : 0;
       const sendFinishNotification = () => {
         if (enginePlayer?.finishOrder === 1) {
           if (enginePlayer.prevRank === "大貧民") {
@@ -660,6 +667,8 @@ export class GameRoom {
         }
       }, 3000);
     } else if (result.eightCut) {
+      // 革命と同時発火時は革命演出(約3秒)の後に8切り演出が出るため、場のクリアまでの時間を延長
+      const eightCutResolveDelay = result.revolution ? 6500 : 3500;
       this.eightCutTimer = setTimeout(() => {
         this.eightCutTimer = null;
         this.engine.resolveEightCut();
@@ -670,7 +679,7 @@ export class GameRoom {
           this.scheduleAutoPass();
           this.scheduleCpuAction();
         }
-      }, 3500);
+      }, eightCutResolveDelay);
     } else if (result.nakiChance) {
       this.startNakiWindow();
     } else if (this.engine.phase === "round_end") {

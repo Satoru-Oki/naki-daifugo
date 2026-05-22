@@ -69,7 +69,6 @@ export default function GamePage() {
   const [connected, setConnected] = useState(true);
   const prevPhaseRef = useRef<string>("");
   const prevTurnRef = useRef<string>("");
-  const prevRevolutionRef = useRef(false);
   const miyakoOchiThisRoundRef = useRef(false);
   const playersRef = useRef<{ id: string; name: string; avatar?: string }[]>([]);
   const handRef = useRef<GameCard[]>([]);
@@ -207,12 +206,6 @@ export default function GamePage() {
         playTurnNotify();
       }
       prevTurnRef.current = state.currentTurn;
-      // 革命が発動したら派手に演出
-      if (state.isRevolution !== prevRevolutionRef.current) {
-        playRevolution();
-        announce("革命発動！！", "revolution");
-      }
-      prevRevolutionRef.current = state.isRevolution;
       setIsRevolution(state.isRevolution);
       setIsElevenBack(state.isElevenBack);
       setRound(state.round);
@@ -277,6 +270,11 @@ export default function GamePage() {
       // プレイヤー名からアバターを引くヘルパー
       const findPlayer = (name: string) => playersRef.current.find((p) => p.name === name);
 
+      if (data.message.includes("革命発動")) {
+        playRevolution();
+        announce("革命発動！！", "revolution");
+        return;
+      }
       if (data.message.includes("8切り") && data.cards) {
         announce("✂️ 8切り！", "eightCut", data.cards);
         return;
