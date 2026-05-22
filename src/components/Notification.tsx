@@ -162,36 +162,18 @@ export function BigAnnouncement({ message, type, cards, playerName, playerAvatar
     );
   }
 
-  // 8切り: テキスト + カード演出（場の中央付近に表示）
+  // 8切り: テキストのみ（場のカードは Field 側で表示されているため重複させない）
   if (type === "eightCut") {
     return (
-      <div className="fixed inset-x-0 top-[30%] z-[300] flex flex-col items-center pointer-events-none">
-        <div className="animate-[eightCutText_0.4s_ease-out_both] text-5xl font-black text-emerald-300 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
+      <div className="fixed inset-x-0 top-[18%] z-[300] flex flex-col items-center pointer-events-none">
+        <div className="animate-[eightCutText_0.4s_ease-out_both] text-6xl font-black text-emerald-300 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
           ✂️ 8切り！
         </div>
-        {cards && cards.length > 0 && (
-          <div className="flex gap-2 mt-4">
-            {cards.map((c, i) => (
-              <div
-                key={c.id}
-                className="animate-[eightCutCard_0.5s_ease-out_both]"
-                style={{ animationDelay: `${0.2 + i * 0.08}s` }}
-              >
-                <PlayingCard card={c} size="lg" />
-              </div>
-            ))}
-          </div>
-        )}
         <style>{`
           @keyframes eightCutText {
             0% { opacity: 0; transform: scale(1.8); }
             60% { opacity: 1; transform: scale(0.95); }
             100% { opacity: 1; transform: scale(1); }
-          }
-          @keyframes eightCutCard {
-            0% { opacity: 0; transform: translateY(-60px) scale(0.4); }
-            70% { opacity: 1; transform: translateY(4px) scale(1.05); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
           }
         `}</style>
       </div>
